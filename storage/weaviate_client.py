@@ -57,9 +57,12 @@ class WeaviateClient:
         """Connect to Weaviate instance"""
         try:
             if self.api_key:
-                # Weaviate Cloud
+                # Weaviate Cloud - strip protocol and whitespace
+                cluster_url = self.url.strip()
+                cluster_url = cluster_url.replace("https://", "").replace("http://", "")
+                logger.info(f"Connecting to Weaviate Cloud: {cluster_url}")
                 self._client = weaviate.connect_to_weaviate_cloud(
-                    cluster_url=self.url,
+                    cluster_url=cluster_url,
                     auth_credentials=weaviate.auth.AuthApiKey(self.api_key),
                     headers={"X-OpenAI-Api-Key": self.openai_api_key} if self.openai_api_key else None
                 )
