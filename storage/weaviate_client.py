@@ -234,7 +234,7 @@ class WeaviateClient:
             name=OUTCOMES_COLLECTION,
             description="Aggregated user journey outcomes for RAG",
 
-            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_openai(),
 
             properties=[
                 Property(
