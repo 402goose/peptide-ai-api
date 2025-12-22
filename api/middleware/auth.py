@@ -1,0 +1,185 @@
+"""
+Peptide AI - Authentication Middleware
+
+API key and JWT validation for securing endpoints.
+"""
+
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
+import hashlib
+from typing import Optional
+import logging
+
+from api.deps import get_settings, get_database
+
+logger = logging.getLogger(__name__)
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware for API key authentication
+
+    Supports:
+    - API key in header (X-API-Key)
+    - API key in query param (?api_key=...)
+    - Public endpoints (no auth required)
+    """
+
+    # Endpoints that don't require authentication
+    PUBLIC_PATHS = {
+        "/",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/health",
+        "/health/ready",
+        "/health/live",
+    }
+
+    def __init__(self, app: ASGIApp):
+        super().__init__(app)
+        self.settings = get_settings()
+
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth for public paths
+        if request.url.path in self.PUBLIC_PATHS:
+            return await call_next(request)
+
+        # Skip auth for OPTIONS (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # Extract API key
+        api_key = self._extract_api_key(request)
+
+        if not api_key:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": "API key required",
+                    "type": "authentication_error",
+                    "detail": "Provide API key via X-API-Key header or api_key query parameter"
+                }
+            )
+
+        # Validate API key
+        user_info = await self._validate_api_key(api_key)
+
+        if not user_info:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": "Invalid API key",
+                    "type": "authentication_error"
+                }
+            )
+
+        # Attach user info to request state
+        request.state.user_id = user_info.get("user_id")
+        request.state.subscription_tier = user_info.get("subscription_tier", "free")
+        request.state.is_admin = user_info.get("is_admin", False)
+
+        return await call_next(request)
+
+    def _extract_api_key(self, request: Request) -> Optional[str]:
+        """Extract API key from request"""
+        # Try header first
+        api_key = request.headers.get(self.settings.api_key_header)
+        if api_key:
+            return api_key
+
+        # Try query parameter
+        api_key = request.query_params.get("api_key")
+        if api_key:
+            return api_key
+
+        return None
+
+    async def _validate_api_key(self, api_key: str) -> Optional[dict]:
+        """
+        Validate API key and return user info
+
+        Returns dict with: user_id, subscription_tier, is_admin
+        """
+        # Check master key (for dev/admin)
+        if api_key == self.settings.master_api_key:
+            return {
+                "user_id": "admin",
+                "subscription_tier": "admin",
+                "is_admin": True
+            }
+
+        # Hash the key for lookup
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+
+        try:
+            db = get_database()
+            key_doc = await db.api_keys.find_one({"key_hash": key_hash})
+
+            if not key_doc:
+                return None
+
+            if not key_doc.get("is_active", True):
+                return None
+
+            # Get user info
+            user = await db.users.find_one({"user_id": key_doc["user_id"]})
+
+            return {
+                "user_id": key_doc["user_id"],
+                "subscription_tier": user.get("subscription_tier", "free") if user else "free",
+                "is_admin": key_doc.get("is_admin", False)
+            }
+
+        except Exception as e:
+            logger.error(f"Error validating API key: {e}")
+            return None
+
+
+async def get_current_user(request: Request) -> dict:
+    """
+    FastAPI dependency to get current user from request state
+
+    Use in routes:
+        @router.get("/me")
+        async def get_me(user: dict = Depends(get_current_user)):
+            return user
+    """
+    if not hasattr(request.state, "user_id"):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    return {
+        "user_id": request.state.user_id,
+        "subscription_tier": request.state.subscription_tier,
+        "is_admin": request.state.is_admin
+    }
+
+
+async def require_tier(request: Request, required_tiers: list[str]) -> bool:
+    """
+    Check if user has required subscription tier
+
+    Use in routes:
+        @router.get("/premium")
+        async def premium_feature(request: Request):
+            if not await require_tier(request, ["pro", "pro_ship", "creator", "admin"]):
+                raise HTTPException(403, "Upgrade required")
+    """
+    tier = getattr(request.state, "subscription_tier", "free")
+    return tier in required_tiers
+
+
+def create_api_key(user_id: str) -> tuple[str, str]:
+    """
+    Create a new API key for a user
+
+    Returns: (raw_key, key_hash)
+    - raw_key: Give this to the user (only shown once)
+    - key_hash: Store this in the database
+    """
+    import secrets
+    raw_key = f"pk_{secrets.token_urlsafe(32)}"
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    return raw_key, key_hash

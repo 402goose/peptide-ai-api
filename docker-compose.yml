@@ -1,0 +1,135 @@
+services:
+  # ==========================================================================
+  # Peptide AI Web Frontend
+  # ==========================================================================
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+    depends_on:
+      - api
+    networks:
+      - peptide-network
+
+  # ==========================================================================
+  # Peptide AI API
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017
+      - MONGODB_DATABASE=peptide_ai
+      - WEAVIATE_URL=http://weaviate:8080
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PEPTIDE_AI_MASTER_KEY=${PEPTIDE_AI_MASTER_KEY:-dev-key-change-me}
+      # LLM Configuration - use Ollama by default
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+    depends_on:
+      - mongo
+      - weaviate
+      - redis
+    volumes:
+      - .:/app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - peptide-network
+
+  # ==========================================================================
+  # MongoDB - Document Store
+  # ==========================================================================
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=peptide_ai
+    networks:
+      - peptide-network
+
+  # ==========================================================================
+  # Weaviate - Vector Database
+  # ==========================================================================
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.28.0
+    ports:
+      - "8080:8080"
+      - "50051:50051"  # gRPC
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "text2vec-transformers"
+      ENABLE_MODULES: "text2vec-transformers"
+      TRANSFORMERS_INFERENCE_API: "http://t2v-transformers:8080"
+      CLUSTER_HOSTNAME: "node1"
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    depends_on:
+      - t2v-transformers
+    networks:
+      - peptide-network
+
+  # ==========================================================================
+  # Transformers - Local Embedding Model (no API key needed)
+  # ==========================================================================
+  t2v-transformers:
+    image: cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    environment:
+      ENABLE_CUDA: "0"
+    networks:
+      - peptide-network
+
+  # ==========================================================================
+  # Redis - Caching & Rate Limiting
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - peptide-network
+
+  # ==========================================================================
+  # Mongo Express - Database UI (development only)
+  # ==========================================================================
+  mongo-express:
+    image: mongo-express:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin
+    depends_on:
+      - mongo
+    profiles:
+      - dev
+    networks:
+      - peptide-network
+
+volumes:
+  mongo-data:
+  weaviate-data:
+  redis-data:
+
+networks:
+  peptide-network:
+    driver: bridge
