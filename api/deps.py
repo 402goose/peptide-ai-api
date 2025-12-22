@@ -22,8 +22,8 @@ _weaviate: Optional[WeaviateClient] = None
 class Settings:
     """Application settings from environment"""
 
-    # Database
-    mongodb_url: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+    # Database (MONGO_PUBLIC_URL for Railway external access)
+    mongodb_url: str = os.getenv("MONGO_PUBLIC_URL", os.getenv("MONGO_URL", "mongodb://localhost:27017"))
     mongodb_database: str = os.getenv("MONGODB_DATABASE", "peptide_ai")
 
     # API Keys
