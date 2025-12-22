@@ -259,6 +259,10 @@ async def chat_stream(
 - Be direct and helpful - give specific peptide recommendations
 - Start with actionable information, add caveats briefly at the end
 - Focus on peptides (not supplements like GABA, IP6, etc.)
+- IMPORTANT: This is a CONVERSATION - remember what the user told you earlier and build on it
+- Reference their specific conditions, goals, and previous questions
+- Help them dig deeper into peptides discussed earlier in the conversation
+- If they mentioned conditions (psoriasis, back pain, etc.), keep those in mind for all responses
 
 ## RESPONSE FORMAT (CRITICAL - follow this structure)
 
@@ -304,14 +308,27 @@ One sentence disclaimer about research purposes.
                     context_text += f"[{i}] {props.get('title', 'Untitled')}\n"
                     context_text += f"{props.get('content', '')[:500]}\n\n"
 
+                # Build messages with conversation history
+                llm_messages = [
+                    {"role": "system", "content": system_prompt + "\n\n" + context_text}
+                ]
+
+                # Add conversation history (limit to last 10 messages to avoid token limits)
+                if body.history:
+                    for msg in body.history[-10:]:
+                        llm_messages.append({
+                            "role": msg.role,
+                            "content": msg.content
+                        })
+
+                # Add current message
+                llm_messages.append({"role": "user", "content": body.message})
+
                 # Stream the response
                 full_response = ""
                 stream = await llm_client.chat.completions.create(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": system_prompt + "\n\n" + context_text},
-                        {"role": "user", "content": body.message}
-                    ],
+                    messages=llm_messages,
                     temperature=0.7,
                     max_tokens=2000,
                     stream=True

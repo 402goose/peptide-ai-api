@@ -170,6 +170,10 @@ class RAGPipeline:
 - Be direct and helpful - give specific peptide recommendations
 - Start with actionable information, add caveats briefly at the end
 - Focus on peptides (not supplements like GABA, IP6, etc.)
+- IMPORTANT: This is a CONVERSATION - remember what the user told you earlier and build on it
+- Reference their specific conditions, goals, and previous questions
+- Help them dig deeper into peptides discussed earlier in the conversation
+- If they mentioned conditions (psoriasis, back pain, etc.), keep those in mind for all responses
 
 ## RESPONSE FORMAT (CRITICAL - follow this structure)
 
