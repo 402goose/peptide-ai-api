@@ -132,15 +132,17 @@ def get_database() -> AsyncIOMotorDatabase:
 
 
 async def init_weaviate():
-    """Initialize Weaviate connection"""
+    """Initialize Weaviate connection and create schema"""
     global _weaviate
 
     settings = get_settings()
     _weaviate = WeaviateClient(
         url=settings.weaviate_url,
+        api_key=settings.weaviate_api_key if settings.weaviate_api_key else None,
         openai_api_key=settings.openai_api_key
     )
     await _weaviate.connect()
+    await _weaviate.create_schema()
 
 
 async def close_weaviate():
