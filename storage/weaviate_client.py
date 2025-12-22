@@ -109,8 +109,8 @@ class WeaviateClient:
             name=CHUNKS_COLLECTION,
             description="Processed document chunks from research papers and other sources",
 
-            # Enable hybrid search with local transformer model
-            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            # Enable hybrid search with OpenAI embeddings (for Weaviate Cloud)
+            vectorizer_config=Configure.Vectorizer.text2vec_openai(),
 
             # Vector index config
             vector_index_config=Configure.VectorIndex.hnsw(
