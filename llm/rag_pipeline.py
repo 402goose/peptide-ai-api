@@ -16,6 +16,7 @@ from datetime import datetime
 import openai
 
 from llm.query_classifier import QueryClassifier, QueryClassification, QueryType, RiskLevel
+from llm.evidence_classifier import get_evidence_for_peptide, get_evidence_badge, enrich_context_with_evidence
 from storage.weaviate_client import WeaviateClient
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,10 @@ class RAGPipeline:
 
         # 4. Build the prompt
         system_prompt = self._build_system_prompt(classification, user_context)
-        context_prompt = self._build_context_prompt(context_docs)
+        context_prompt = self._build_context_prompt(
+            context_docs,
+            peptides_mentioned=classification.peptides_mentioned
+        )
 
         # 5. Build conversation messages
         messages = self._build_messages(
@@ -175,6 +179,17 @@ class RAGPipeline:
 - Help them dig deeper into peptides discussed earlier in the conversation
 - If they mentioned conditions (psoriasis, back pain, etc.), keep those in mind for all responses
 
+## HANDLING SKEPTICS & EVIDENCE QUESTIONS
+When users ask about evidence, studies, or express skepticism:
+- BE HONEST about research limitations upfront - most peptide research is preclinical (animal studies)
+- CITE SPECIFIC STUDIES when available: "Sikiric et al. (2013) found..." or "In a 2022 study with 42 participants..."
+- ACKNOWLEDGE what we DON'T know: "Human clinical trials are limited" or "Long-term safety data is lacking"
+- DON'T repeat dosing protocols when they're asking about evidence quality
+- CRITIQUE study quality when relevant: "This was a small study (n=12) without a control group"
+- VALIDATE their skepticism: "You're right to want evidence - here's what we actually know..."
+- AVOID hype language like "miracle", "breakthrough", or "game-changer"
+- DISTINGUISH clearly between: peer-reviewed human trials > animal studies > in-vitro > anecdotal
+
 ## RESPONSE FORMAT (CRITICAL - follow this structure)
 
 Start with a brief 1-2 sentence intro addressing their situation.
@@ -186,6 +201,8 @@ Then for EACH peptide you recommend, use this exact format:
 ### 🧬 [Peptide Name]
 
 **Why it helps:** One sentence explaining the mechanism relevant to their condition.
+
+**Evidence:** Use the badge from the EVIDENCE QUALITY section (🟢 Strong, 🟡 Moderate, 🔴 Limited, ⚪ Anecdotal) + brief explanation
 
 **Typical Protocol:**
 - **Dose:** X-Y mcg/mg, frequency
@@ -274,22 +291,41 @@ Tailor your response to their experience level and goals.
 
         return prompt
 
-    def _build_context_prompt(self, context_docs: List[Dict[str, Any]]) -> str:
+    def _build_context_prompt(
+        self,
+        context_docs: List[Dict[str, Any]],
+        peptides_mentioned: Optional[List[str]] = None
+    ) -> str:
         """Build context section from retrieved documents"""
-        if not context_docs:
-            return "No specific research context available for this query."
+        sections = []
 
-        sections = ["RELEVANT CONTEXT:"]
+        # Add evidence quality for mentioned peptides
+        if peptides_mentioned:
+            sections.append("## EVIDENCE QUALITY (use these badges in your response):\n")
+            for peptide in peptides_mentioned[:5]:  # Limit to top 5
+                evidence = get_evidence_for_peptide(peptide)
+                badge = get_evidence_badge(evidence.level)
+                sections.append(f"**{peptide}**: {badge}")
+                sections.append(f"  - Human studies: {evidence.human_studies}, Animal: {evidence.animal_studies}")
+                sections.append(f"  - FDA: {evidence.fda_status}")
+                sections.append(f"  - {evidence.summary}\n")
+
+        if not context_docs:
+            sections.append("\nNo specific research context available for this query.")
+            return "\n".join(sections)
+
+        sections.append("\n## RELEVANT RESEARCH CONTEXT:")
 
         for i, doc in enumerate(context_docs[:10], 1):
             props = doc.get("properties", {})
             collection = doc.get("collection", "unknown")
+            source_type = props.get('source_type', 'unknown').upper()
 
             if collection == "PeptideChunk":
                 # Research document
                 sections.append(f"""
 [{i}] {props.get('title', 'Untitled')}
-Source: {props.get('source_type', 'unknown').upper()}
+Source: {source_type}
 Citation: {props.get('citation', 'N/A')}
 Content: {props.get('content', '')[:500]}...
 """)

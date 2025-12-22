@@ -162,6 +162,79 @@ async def cmd_test_pubmed(args):
         print()
 
 
+async def cmd_ingest_reddit(args):
+    """Ingest Reddit data into Weaviate"""
+    from sources.reddit_ingestion import RedditIngestion
+    from storage.weaviate_client import WeaviateClient
+    from processing.chunker import SimpleChunker
+    from models.documents import RawDocument, SourceType
+
+    logger.info("🔴 Starting Reddit ingestion...")
+
+    # Initialize Reddit ingestion
+    reddit = RedditIngestion()
+    chunker = SimpleChunker(chunk_size=1500, overlap=150)
+
+    # Initialize Weaviate
+    weaviate = WeaviateClient(
+        url=os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+        api_key=os.getenv("WEAVIATE_API_KEY") or None,
+        openai_api_key=os.getenv("OPENAI_API_KEY", "")
+    )
+
+    try:
+        await weaviate.connect()
+
+        # Fetch Reddit posts
+        posts = await reddit.ingest_all(posts_per_sub=args.max)
+
+        print(f"\n📊 Fetched {len(posts)} Reddit posts/comments")
+        print(f"   Experience reports: {sum(1 for p in posts if p.is_experience_report)}")
+
+        # Convert and store in Weaviate
+        chunks_stored = 0
+        errors = 0
+
+        for post in posts:
+            try:
+                # Create RawDocument for chunking
+                raw_doc = RawDocument(
+                    source_id=f"reddit_{post.id}",
+                    source_type=SourceType.REDDIT,
+                    title=post.title if post.title else f"Reddit: {', '.join(post.peptides_mentioned)}",
+                    content=post.content,
+                    authors=[post.author] if post.author != '[deleted]' else [],
+                    publication_date=post.created_utc,
+                    url=post.url,
+                    citation=f"Reddit r/{post.subreddit} - u/{post.author} ({post.created_utc.strftime('%Y-%m-%d')})",
+                )
+
+                # Chunk the document
+                chunks = chunker.chunk_document(raw_doc)
+
+                # Enrich and store chunks
+                for chunk in chunks:
+                    # Add peptide mentions from post
+                    chunk.peptides_mentioned = post.peptides_mentioned
+
+                    # Store in Weaviate using index_chunk
+                    await weaviate.index_chunk(chunk)
+                    chunks_stored += 1
+
+            except Exception as e:
+                logger.error(f"Error storing post {post.id}: {e}")
+                errors += 1
+
+        print(f"\n✅ Reddit Ingestion Complete!")
+        print(f"   Posts processed: {len(posts)}")
+        print(f"   Chunks stored: {chunks_stored}")
+        print(f"   Errors: {errors}")
+
+    finally:
+        await reddit.close()
+        await weaviate.close()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Peptide AI CLI",
@@ -193,6 +266,10 @@ def main():
     test_parser.add_argument("--query", help="Search query")
     test_parser.add_argument("--max", type=int, default=5, help="Max results")
 
+    # Reddit ingestion command
+    reddit_parser = subparsers.add_parser("ingest-reddit", help="Ingest Reddit data")
+    reddit_parser.add_argument("--max", type=int, default=50, help="Max posts per subreddit")
+
     args = parser.parse_args()
 
     if args.command == "ingest":
@@ -205,6 +282,8 @@ def main():
         asyncio.run(cmd_search(args))
     elif args.command == "test-pubmed":
         asyncio.run(cmd_test_pubmed(args))
+    elif args.command == "ingest-reddit":
+        asyncio.run(cmd_ingest_reddit(args))
     else:
         parser.print_help()
 

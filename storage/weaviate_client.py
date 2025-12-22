@@ -324,27 +324,25 @@ class WeaviateClient:
         """Index a single processed chunk"""
         collection = self.client.collections.get(CHUNKS_COLLECTION)
 
-        obj = DataObject(
-            properties={
-                "chunk_id": chunk.chunk_id,
-                "document_id": chunk.document_id,
-                "source_type": chunk.source_type.value,
-                "content": chunk.content,
-                "section_type": chunk.section_type,
-                "peptides_mentioned": chunk.peptides_mentioned,
-                "fda_status": chunk.fda_status.value,
-                "conditions_mentioned": chunk.conditions_mentioned,
-                "title": chunk.title,
-                "authors": chunk.authors,
-                "publication_date": (chunk.publication_date.isoformat() + "Z") if chunk.publication_date else None,
-                "url": chunk.url,
-                "doi": chunk.doi,
-                "citation": chunk.citation,
-                "original_language": chunk.original_language,
-            }
-        )
+        properties = {
+            "chunk_id": chunk.chunk_id,
+            "document_id": chunk.document_id,
+            "source_type": chunk.source_type.value if hasattr(chunk.source_type, 'value') else str(chunk.source_type),
+            "content": chunk.content,
+            "section_type": chunk.section_type,
+            "peptides_mentioned": chunk.peptides_mentioned,
+            "fda_status": chunk.fda_status.value if hasattr(chunk.fda_status, 'value') else str(chunk.fda_status),
+            "conditions_mentioned": chunk.conditions_mentioned,
+            "title": chunk.title,
+            "authors": chunk.authors,
+            "publication_date": (chunk.publication_date.isoformat() + "Z") if chunk.publication_date else None,
+            "url": chunk.url,
+            "doi": chunk.doi,
+            "citation": chunk.citation,
+            "original_language": getattr(chunk, 'original_language', 'en'),
+        }
 
-        result = collection.data.insert(obj)
+        result = collection.data.insert(properties)
         return str(result)
 
     async def index_chunks_batch(self, chunks: List[ProcessedChunk]) -> int:
@@ -353,25 +351,23 @@ class WeaviateClient:
 
         objects = []
         for chunk in chunks:
-            objects.append(DataObject(
-                properties={
-                    "chunk_id": chunk.chunk_id,
-                    "document_id": chunk.document_id,
-                    "source_type": chunk.source_type.value,
-                    "content": chunk.content,
-                    "section_type": chunk.section_type,
-                    "peptides_mentioned": chunk.peptides_mentioned,
-                    "fda_status": chunk.fda_status.value,
-                    "conditions_mentioned": chunk.conditions_mentioned,
-                    "title": chunk.title,
-                    "authors": chunk.authors,
-                    "publication_date": (chunk.publication_date.isoformat() + "Z") if chunk.publication_date else None,
-                    "url": chunk.url,
-                    "doi": chunk.doi,
-                    "citation": chunk.citation,
-                    "original_language": chunk.original_language,
-                }
-            ))
+            objects.append({
+                "chunk_id": chunk.chunk_id,
+                "document_id": chunk.document_id,
+                "source_type": chunk.source_type.value if hasattr(chunk.source_type, 'value') else str(chunk.source_type),
+                "content": chunk.content,
+                "section_type": chunk.section_type,
+                "peptides_mentioned": chunk.peptides_mentioned,
+                "fda_status": chunk.fda_status.value if hasattr(chunk.fda_status, 'value') else str(chunk.fda_status),
+                "conditions_mentioned": chunk.conditions_mentioned,
+                "title": chunk.title,
+                "authors": chunk.authors,
+                "publication_date": (chunk.publication_date.isoformat() + "Z") if chunk.publication_date else None,
+                "url": chunk.url,
+                "doi": chunk.doi,
+                "citation": chunk.citation,
+                "original_language": getattr(chunk, 'original_language', 'en'),
+            })
 
         result = collection.data.insert_many(objects)
         return len(result.all_responses)
