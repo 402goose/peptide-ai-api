@@ -7,9 +7,31 @@ Database connections and shared dependencies for FastAPI.
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from functools import lru_cache
+from urllib.parse import quote_plus
 import os
 
 from storage.weaviate_client import WeaviateClient
+
+
+def _build_mongo_url() -> str:
+    """Build MongoDB URL from environment, handling password escaping"""
+    # Prefer building from components (Railway provides these) to handle special chars
+    host = os.getenv("MONGOHOST")
+    port = os.getenv("MONGOPORT")
+    user = os.getenv("MONGOUSER")
+    password = os.getenv("MONGOPASSWORD")
+
+    if host and user and password:
+        # URL-encode password to handle special characters
+        escaped_password = quote_plus(password)
+        return f"mongodb://{user}:{escaped_password}@{host}:{port}"
+
+    # Fall back to pre-built URL
+    mongo_url = os.getenv("MONGO_PUBLIC_URL") or os.getenv("MONGO_URL")
+    if mongo_url:
+        return mongo_url
+
+    return "mongodb://localhost:27017"
 
 # Global database connection
 _db_client: Optional[AsyncIOMotorClient] = None
@@ -22,8 +44,8 @@ _weaviate: Optional[WeaviateClient] = None
 class Settings:
     """Application settings from environment"""
 
-    # Database (MONGO_PUBLIC_URL for Railway external access)
-    mongodb_url: str = os.getenv("MONGO_PUBLIC_URL", os.getenv("MONGO_URL", "mongodb://localhost:27017"))
+    # Database (built from components to handle password escaping)
+    mongodb_url: str = _build_mongo_url()
     mongodb_database: str = os.getenv("MONGODB_DATABASE", "peptide_ai")
 
     # API Keys
