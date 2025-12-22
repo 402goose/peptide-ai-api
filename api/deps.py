@@ -7,7 +7,6 @@ Database connections and shared dependencies for FastAPI.
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from functools import lru_cache
-from urllib.parse import quote_plus
 import os
 
 from storage.weaviate_client import WeaviateClient
@@ -15,39 +14,15 @@ from storage.weaviate_client import WeaviateClient
 
 def _build_mongo_url() -> str:
     """Build MongoDB URL from environment, handling password escaping"""
-    from urllib.parse import urlparse, urlunparse
+    # Check MONGODB_URL first (user-configured)
+    mongo_url = os.getenv("MONGODB_URL")
+    if mongo_url and mongo_url != "mongodb://localhost:27017":
+        return mongo_url
 
-    # Try MONGO_PUBLIC_URL first (external access) and fix escaping
-    public_url = os.getenv("MONGO_PUBLIC_URL")
-    if public_url:
-        try:
-            parsed = urlparse(public_url)
-            if parsed.password:
-                # Re-escape the password properly
-                escaped_password = quote_plus(parsed.password)
-                # Rebuild URL with escaped password
-                netloc = f"{parsed.username}:{escaped_password}@{parsed.hostname}"
-                if parsed.port:
-                    netloc += f":{parsed.port}"
-                return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-            return public_url
-        except Exception:
-            pass
-
-    # Build from components using public host
-    user = os.getenv("MONGOUSER")
-    password = os.getenv("MONGOPASSWORD")
-    port = os.getenv("MONGOPORT")
-
-    # Try to extract public host from MONGO_PUBLIC_URL
-    if public_url and user and password:
-        try:
-            parsed = urlparse(public_url)
-            host = parsed.hostname
-            escaped_password = quote_plus(password)
-            return f"mongodb://{user}:{escaped_password}@{host}:{port}"
-        except Exception:
-            pass
+    # Fall back to MONGO_PUBLIC_URL
+    mongo_url = os.getenv("MONGO_PUBLIC_URL")
+    if mongo_url:
+        return mongo_url
 
     # Last resort: local
     return "mongodb://localhost:27017"
