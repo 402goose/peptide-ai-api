@@ -39,6 +39,7 @@ async def cmd_ingest(args):
 
     stats = await run_full_ingestion(
         weaviate_url=os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+        weaviate_api_key=os.getenv("WEAVIATE_API_KEY", ""),
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
         queries=queries,
         max_per_query=args.max
@@ -56,6 +57,7 @@ async def cmd_schema(args):
 
     weaviate = WeaviateClient(
         url=os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+        api_key=os.getenv("WEAVIATE_API_KEY") or None,
         openai_api_key=os.getenv("OPENAI_API_KEY", "")
     )
 
@@ -85,6 +87,7 @@ async def cmd_stats(args):
 
     weaviate = WeaviateClient(
         url=os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+        api_key=os.getenv("WEAVIATE_API_KEY") or None,
     )
 
     try:
@@ -108,6 +111,7 @@ async def cmd_search(args):
 
     weaviate = WeaviateClient(
         url=os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+        api_key=os.getenv("WEAVIATE_API_KEY") or None,
         openai_api_key=os.getenv("OPENAI_API_KEY", "")
     )
 

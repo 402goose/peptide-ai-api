@@ -169,6 +169,7 @@ class IngestionPipeline:
 
 async def run_full_ingestion(
     weaviate_url: str = "http://localhost:8080",
+    weaviate_api_key: str = "",
     openai_api_key: str = "",
     queries: Optional[List[str]] = None,
     max_per_query: int = 100
@@ -181,6 +182,7 @@ async def run_full_ingestion(
     # Initialize Weaviate
     weaviate = WeaviateClient(
         url=weaviate_url,
+        api_key=weaviate_api_key if weaviate_api_key else None,
         openai_api_key=openai_api_key
     )
 
