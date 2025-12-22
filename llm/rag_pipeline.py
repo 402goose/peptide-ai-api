@@ -99,8 +99,8 @@ class RAGPipeline:
         # 9. Format sources
         sources = self._format_sources(context_docs)
 
-        # 10. Generate follow-up suggestions
-        follow_ups = self._suggest_followups(classification, context_docs)
+        # 10. Generate LLM-based follow-up suggestions
+        follow_ups = await self._generate_followups(query, response_text)
 
         elapsed_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
 
@@ -164,28 +164,49 @@ class RAGPipeline:
         user_context: Optional[Dict[str, Any]]
     ) -> str:
         """Build the system prompt based on query type"""
-        base_prompt = """You are Peptide AI, an expert research assistant for peptides. You help users understand peptide research and protocols.
+        base_prompt = """You are Peptide AI, an expert research assistant. Help users understand peptide research and protocols.
 
-CRITICAL RULES:
-- ALWAYS be helpful and provide specific peptide recommendations
-- NEVER say "I can't recommend" or "consult a doctor first" at the START of responses
-- START with actionable peptide information, then add caveats at the end
-- This is a RESEARCH PLATFORM - users expect peptide-specific answers
-- Only discuss actual peptides (not supplements like GABA, IP6, etc.)
+## YOUR APPROACH
+- Be direct and helpful - give specific peptide recommendations
+- Start with actionable information, add caveats briefly at the end
+- Focus on peptides (not supplements like GABA, IP6, etc.)
 
-FORMATTING:
-- Use **bold** for peptide names
-- Structure with clear headers (##)
-- Use bullet points for protocols
-- Include specific dosing ranges from research (e.g., "100-300mcg daily")
-- Keep responses focused and scannable
+## RESPONSE FORMAT (CRITICAL - follow this structure)
 
-RESPONSE STRUCTURE:
-1. Start with a direct answer addressing their specific question
-2. Name 2-4 specific peptides most relevant to their goals
-3. For each peptide: what it does, typical protocol, what users report
-4. Brief safety notes inline (not as separate warning block)
-5. One-line disclaimer at the very end
+Start with a brief 1-2 sentence intro addressing their situation.
+
+Then for EACH peptide you recommend, use this exact format:
+
+---
+
+### 🧬 [Peptide Name]
+
+**Why it helps:** One sentence explaining the mechanism relevant to their condition.
+
+**Typical Protocol:**
+- **Dose:** X-Y mcg/mg, frequency
+- **Duration:** X weeks
+- **Administration:** SubQ, etc.
+
+**What to expect:** 1-2 sentences on timeline and realistic outcomes.
+
+---
+
+After covering peptides, add:
+
+### 💡 Getting Started
+Brief practical advice on which to try first and why.
+
+### ⚠️ Note
+One sentence disclaimer about research purposes.
+
+## FORMATTING RULES
+- Use ### headers with emojis to break up sections
+- Use **bold** for peptide names and key terms
+- Use bullet points with **bold labels** for protocols
+- Keep paragraphs SHORT (2-3 sentences max)
+- Use --- dividers between peptide sections
+- NO walls of text - make it scannable
 
 """
         # Add query-type specific instructions
@@ -377,81 +398,57 @@ Summary: {props.get('outcome_narrative', '')[:300]}...
 
         return sources
 
-    def _suggest_followups(
+    async def _generate_followups(
         self,
-        classification: QueryClassification,
-        context_docs: List[Dict[str, Any]]
+        query: str,
+        response: str
     ) -> List[str]:
-        """Generate relevant follow-up questions"""
-        # Build peptide-specific follow-ups if we know which peptides were discussed
-        peptides = classification.peptides_mentioned
-        conditions = classification.conditions_mentioned
+        """Generate contextual follow-up questions using LLM"""
+        try:
+            followup_prompt = f"""Based on this conversation about peptides, suggest 3-4 natural follow-up questions the user might want to ask next.
 
-        # Peptide-specific follow-ups
-        if peptides:
-            peptide = peptides[0]  # Use first mentioned peptide
-            return [
-                f"What's the typical {peptide} protocol and dosing?",
-                f"What do users report experiencing with {peptide}?",
-                f"What are the side effects of {peptide}?",
-                f"Can {peptide} be combined with other peptides?"
-            ]
+USER'S QUESTION: {query}
 
-        # Condition-specific follow-ups
-        if conditions:
-            condition = conditions[0]
-            return [
-                f"Which peptides are best for {condition}?",
-                f"What does the research say about peptides for {condition}?",
-                f"What protocols do people use for {condition}?",
-                f"How long until I might see results?"
-            ]
+YOUR RESPONSE (summary): {response[:500]}...
 
-        # Query type fallbacks
-        followups = {
-            QueryType.RESEARCH: [
-                "What clinical trials have been conducted?",
-                "What are the known mechanisms of action?",
-                "How does the research compare to user experiences?"
-            ],
-            QueryType.DOSING: [
-                "What side effects should I watch for?",
-                "How long does a typical cycle last?",
-                "What's the best time of day to administer?",
-                "How do I reconstitute and store this peptide?"
-            ],
-            QueryType.SAFETY: [
-                "Are there any known drug interactions?",
-                "What are signs that I should stop using?",
-                "How do long-term users report outcomes?",
-                "What bloodwork should I monitor?"
-            ],
-            QueryType.EXPERIENCE: [
-                "What does the research say about this?",
-                "What protocols do most users follow?",
-                "How long until users typically see results?",
-                "What's the most common starting dose?"
-            ],
-            QueryType.STACKING: [
-                "What are the individual effects of each compound?",
-                "Are there any interaction concerns?",
-                "What timing works best for this stack?",
-                "Should I start with one peptide first?"
-            ],
-            QueryType.GENERAL: [
-                "What peptides would you recommend for my goals?",
-                "How do I get started with peptides?",
-                "What should I know before starting?",
-                "What results can I realistically expect?"
-            ],
-        }
+Generate follow-up questions that:
+1. Help them dive deeper into the specific peptides mentioned
+2. Address practical concerns (dosing, timing, what to expect)
+3. Explore related topics they might not have considered
+4. Are conversational and specific (not generic)
 
-        return followups.get(classification.query_type, [
-            "What peptides are best for my goals?",
-            "How do I get started?",
-            "What should I expect?",
-            "What are the safety considerations?"
-        ])
+Return ONLY a JSON array of 3-4 question strings. Example:
+["How should I time my BPC-157 doses around meals?", "What results do most people see in the first 2 weeks?", "Should I cycle off or can I use this continuously?"]"""
+
+            response_obj = await self.openai.chat.completions.create(
+                model="gpt-4o-mini",  # Use fast model for follow-ups
+                messages=[{"role": "user", "content": followup_prompt}],
+                temperature=0.7,
+                max_tokens=300,
+            )
+
+            import json
+            content = response_obj.choices[0].message.content or "[]"
+            # Clean up the response - extract JSON array
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+
+            follow_ups = json.loads(content)
+            if isinstance(follow_ups, list) and len(follow_ups) > 0:
+                return follow_ups[:4]
+        except Exception as e:
+            logger.warning(f"Failed to generate follow-ups: {e}")
+
+        # Fallback to generic but still useful questions
+        return [
+            "What's the typical protocol and dosing for this?",
+            "What side effects should I watch for?",
+            "How long until I might see results?",
+            "Can these peptides be combined with others?"
+        ]
 
     def _blocked_response(self, classification: QueryClassification) -> Dict[str, Any]:
         """Generate response for blocked queries"""

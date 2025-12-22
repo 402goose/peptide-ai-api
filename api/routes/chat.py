@@ -253,43 +253,49 @@ async def chat_stream(
                 yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
                 # Build system prompt
-                system_prompt = """You are Peptide AI, a research assistant specializing in peptide science. Provide comprehensive, evidence-based information.
+                system_prompt = """You are Peptide AI, an expert research assistant. Help users understand peptide research and protocols.
 
-## YOUR ROLE
-- Be helpful - always answer the question thoroughly
-- Share research findings with proper context
-- Explain mechanisms, benefits, and risks
-- Reference sources using [1], [2], etc.
-- End with a brief disclaimer
+## YOUR APPROACH
+- Be direct and helpful - give specific peptide recommendations
+- Start with actionable information, add caveats briefly at the end
+- Focus on peptides (not supplements like GABA, IP6, etc.)
 
-## FORMATTING (IMPORTANT)
-- Use **bold** for key terms and peptide names
-- Use ## headers to organize sections
-- Use bullet points for lists
-- Use > blockquotes for research findings
-- Use tables when comparing options
-- Keep paragraphs short (2-3 sentences)
+## RESPONSE FORMAT (CRITICAL - follow this structure)
 
-## STRUCTURE EXAMPLE
-```
-## Overview
-Brief intro with **key peptide** bolded.
+Start with a brief 1-2 sentence intro addressing their situation.
 
-## Mechanism of Action
-> "Research finding" [1]
-
-Key points:
-- **Primary effect**: Description
-- **Secondary effect**: Description
-
-## Clinical Evidence
-Summary of studies [1][2].
+Then for EACH peptide you recommend, use this exact format:
 
 ---
-*Disclaimer: Research purposes only.*
-```
 
-DO NOT refuse to discuss research or give short answers."""
+### 🧬 [Peptide Name]
+
+**Why it helps:** One sentence explaining the mechanism relevant to their condition.
+
+**Typical Protocol:**
+- **Dose:** X-Y mcg/mg, frequency
+- **Duration:** X weeks
+- **Administration:** SubQ, etc.
+
+**What to expect:** 1-2 sentences on timeline and realistic outcomes.
+
+---
+
+After covering peptides, add:
+
+### 💡 Getting Started
+Brief practical advice on which to try first and why.
+
+### ⚠️ Note
+One sentence disclaimer about research purposes.
+
+## FORMATTING RULES
+- Use ### headers with emojis to break up sections
+- Use **bold** for peptide names and key terms
+- Use bullet points with **bold labels** for protocols
+- Keep paragraphs SHORT (2-3 sentences max)
+- Use --- dividers between peptide sections
+- NO walls of text - make it scannable"""
 
                 # Build context
                 context_text = "RELEVANT RESEARCH:\n\n"
@@ -317,15 +323,48 @@ DO NOT refuse to discuss research or give short answers."""
                         full_response += content
                         yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
 
+                # Generate contextual follow-ups using LLM
+                try:
+                    followup_prompt = f"""Based on this conversation about peptides, suggest 3-4 natural follow-up questions.
+
+USER'S QUESTION: {body.message}
+
+YOUR RESPONSE (summary): {full_response[:500]}...
+
+Generate follow-up questions that:
+1. Help them dive deeper into the specific peptides mentioned
+2. Address practical concerns (dosing, timing, what to expect)
+3. Are conversational and specific (not generic)
+
+Return ONLY a JSON array of 3-4 question strings."""
+
+                    followup_response = await llm_client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[{"role": "user", "content": followup_prompt}],
+                        temperature=0.7,
+                        max_tokens=300,
+                    )
+                    followup_content = followup_response.choices[0].message.content or "[]"
+                    followup_content = followup_content.strip()
+                    if followup_content.startswith("```"):
+                        followup_content = followup_content.split("```")[1]
+                        if followup_content.startswith("json"):
+                            followup_content = followup_content[4:]
+                    follow_ups = json.loads(followup_content)
+                    if not isinstance(follow_ups, list):
+                        follow_ups = []
+                except Exception as e:
+                    logger.warning(f"Failed to generate follow-ups: {e}")
+                    follow_ups = [
+                        "What's the typical protocol for this?",
+                        "What side effects should I watch for?",
+                        "How long until I might see results?"
+                    ]
+
                 # Send completion with metadata
                 disclaimers = [
                     "This information is for research and educational purposes only, not medical advice.",
                     "Always consult a qualified healthcare professional before using any peptides."
-                ]
-                follow_ups = [
-                    "What does the research say about dosing?",
-                    "What are the potential side effects?",
-                    "How does this compare to alternatives?"
                 ]
 
                 yield f"data: {json.dumps({'type': 'done', 'disclaimers': disclaimers, 'follow_up_questions': follow_ups})}\n\n"
