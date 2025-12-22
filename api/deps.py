@@ -23,7 +23,7 @@ class Settings:
     """Application settings from environment"""
 
     # Database
-    mongodb_url: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    mongodb_url: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
     mongodb_database: str = os.getenv("MONGODB_DATABASE", "peptide_ai")
 
     # API Keys
