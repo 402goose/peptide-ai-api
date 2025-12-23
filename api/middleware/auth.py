@@ -157,6 +157,27 @@ async def get_current_user(request: Request) -> dict:
     }
 
 
+async def get_optional_user(request: Request) -> Optional[dict]:
+    """
+    FastAPI dependency to get current user if authenticated, or None if not.
+
+    Use for endpoints that work for both authenticated and anonymous users.
+
+    Use in routes:
+        @router.post("/track")
+        async def track_event(user: Optional[dict] = Depends(get_optional_user)):
+            user_id = user["user_id"] if user else None
+    """
+    if not hasattr(request.state, "user_id") or request.state.user_id is None:
+        return None
+
+    return {
+        "user_id": request.state.user_id,
+        "subscription_tier": request.state.subscription_tier,
+        "is_admin": request.state.is_admin
+    }
+
+
 async def require_tier(request: Request, required_tiers: list[str]) -> bool:
     """
     Check if user has required subscription tier
