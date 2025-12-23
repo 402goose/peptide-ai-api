@@ -485,7 +485,7 @@ async def get_persona_test_results(
 
 @router.post("/analytics/persona-tests")
 async def store_persona_test_results(
-    results: dict,
+    request: Request,
     user: dict = Depends(get_current_user)
 ):
     """
@@ -494,6 +494,9 @@ async def store_persona_test_results(
     Called by browser_agent.py after running tests.
     """
     db = get_database()
+
+    # Parse JSON body
+    results = await request.json()
 
     # Add timestamp if not present
     if "timestamp" not in results:
