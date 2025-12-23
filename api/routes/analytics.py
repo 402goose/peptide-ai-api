@@ -444,27 +444,65 @@ async def get_persona_test_results(
     Get the full persona test results from the latest browser test run.
 
     Returns all personas, their sessions, evaluations, and feedback.
+    Checks MongoDB first, then falls back to local file for dev.
     """
+    db = get_database()
+
+    # Try to get from database first (production)
+    latest = await db.persona_test_runs.find_one(
+        sort=[("timestamp", -1)]
+    )
+
+    if latest:
+        # Remove MongoDB _id for JSON serialization
+        latest.pop("_id", None)
+        return {
+            "status": "ok",
+            "results": latest
+        }
+
+    # Fall back to local file (development)
     import os
     import json
 
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     results_path = os.path.join(project_root, "testing", "browser_test_results.json")
 
-    if not os.path.exists(results_path):
+    if os.path.exists(results_path):
+        with open(results_path) as f:
+            results = json.load(f)
         return {
-            "status": "no_results",
-            "message": "No persona test results found. Run browser_agent.py to generate.",
-            "results": None
+            "status": "ok",
+            "results": results
         }
 
-    with open(results_path) as f:
-        results = json.load(f)
-
     return {
-        "status": "ok",
-        "results": results
+        "status": "no_results",
+        "message": "No persona test results found. Run browser_agent.py to generate.",
+        "results": None
     }
+
+
+@router.post("/analytics/persona-tests")
+async def store_persona_test_results(
+    results: dict,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Store persona test results in the database.
+
+    Called by browser_agent.py after running tests.
+    """
+    db = get_database()
+
+    # Add timestamp if not present
+    if "timestamp" not in results:
+        results["timestamp"] = datetime.utcnow().isoformat()
+
+    # Store in database
+    await db.persona_test_runs.insert_one(results)
+
+    return {"status": "stored", "timestamp": results["timestamp"]}
 
 
 @router.get("/analytics/persona-tests/history")
@@ -473,51 +511,55 @@ async def get_persona_test_history(
     user: dict = Depends(get_current_user)
 ):
     """
-    Get historical persona test runs (if archived).
-
-    For now, returns just the latest. In future, can store runs in DB.
+    Get historical persona test runs from the database.
     """
-    import os
-    import json
-    from glob import glob
+    db = get_database()
 
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    results_dir = os.path.join(project_root, "testing")
-
-    # Look for any archived results
     history = []
 
-    # Current results
-    current_path = os.path.join(results_dir, "browser_test_results.json")
-    if os.path.exists(current_path):
-        with open(current_path) as f:
-            data = json.load(f)
-            history.append({
-                "timestamp": data.get("timestamp"),
-                "target_url": data.get("target_url"),
-                "personas_tested": data.get("personas_tested"),
-                "overall_satisfaction": data.get("summary", {}).get("overall_satisfaction"),
-                "would_return_rate": data.get("summary", {}).get("would_return_rate"),
-                "is_current": True
-            })
+    # Get from database
+    cursor = db.persona_test_runs.find(
+        {},
+        {
+            "timestamp": 1,
+            "target_url": 1,
+            "personas_tested": 1,
+            "summary.overall_satisfaction": 1,
+            "summary.would_return_rate": 1,
+        }
+    ).sort("timestamp", -1).limit(limit)
 
-    # Look for archived results (browser_test_results_*.json)
-    archived = glob(os.path.join(results_dir, "browser_test_results_*.json"))
-    for path in sorted(archived, reverse=True)[:limit-1]:
-        with open(path) as f:
-            data = json.load(f)
-            history.append({
-                "timestamp": data.get("timestamp"),
-                "target_url": data.get("target_url"),
-                "personas_tested": data.get("personas_tested"),
-                "overall_satisfaction": data.get("summary", {}).get("overall_satisfaction"),
-                "would_return_rate": data.get("summary", {}).get("would_return_rate"),
-                "is_current": False
-            })
+    async for doc in cursor:
+        history.append({
+            "timestamp": doc.get("timestamp"),
+            "target_url": doc.get("target_url"),
+            "personas_tested": doc.get("personas_tested"),
+            "overall_satisfaction": doc.get("summary", {}).get("overall_satisfaction"),
+            "would_return_rate": doc.get("summary", {}).get("would_return_rate"),
+            "is_current": len(history) == 0  # First one is current
+        })
 
-    return {
-        "history": history[:limit]
-    }
+    # If no DB results, try local file (dev fallback)
+    if not history:
+        import os
+        import json
+
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        results_path = os.path.join(project_root, "testing", "browser_test_results.json")
+
+        if os.path.exists(results_path):
+            with open(results_path) as f:
+                data = json.load(f)
+                history.append({
+                    "timestamp": data.get("timestamp"),
+                    "target_url": data.get("target_url"),
+                    "personas_tested": data.get("personas_tested"),
+                    "overall_satisfaction": data.get("summary", {}).get("overall_satisfaction"),
+                    "would_return_rate": data.get("summary", {}).get("would_return_rate"),
+                    "is_current": True
+                })
+
+    return {"history": history}
 
 
 # =============================================================================

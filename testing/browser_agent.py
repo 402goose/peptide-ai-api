@@ -633,10 +633,25 @@ async def main():
     runner = BrowserTestRunner(personas[:2])  # Start small
     results = await runner.run_all(sessions_per_persona=2, headless=True)
 
-    # Save results
+    # Save results locally
     output_path = os.path.join(project_root, "testing", "browser_test_results.json")
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
+
+    # Upload results to API for persistence in production
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{API_URL}/api/v1/analytics/persona-tests",
+                json=results,
+                headers={"X-API-Key": API_KEY, "Content-Type": "application/json"}
+            )
+            if response.status_code == 200:
+                print("Results uploaded to API successfully")
+            else:
+                print(f"Failed to upload results to API: {response.status_code}")
+    except Exception as e:
+        print(f"Could not upload results to API: {e}")
 
     # Print summary
     print(f"\n{'='*60}")
