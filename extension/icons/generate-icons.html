@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Icons</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    canvas { border: 1px solid #ccc; margin: 10px; }
+    .icon-row { display: flex; gap: 20px; align-items: center; margin: 20px 0; }
+    button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Peptide AI Icon Generator</h1>
+  <p>Click each "Download" button to save the icon as PNG.</p>
+
+  <div class="icon-row">
+    <div>
+      <canvas id="icon16" width="16" height="16"></canvas>
+      <br><button onclick="download('icon16', 'icon16.png')">Download 16x16</button>
+    </div>
+    <div>
+      <canvas id="icon32" width="32" height="32"></canvas>
+      <br><button onclick="download('icon32', 'icon32.png')">Download 32x32</button>
+    </div>
+    <div>
+      <canvas id="icon48" width="48" height="48"></canvas>
+      <br><button onclick="download('icon48', 'icon48.png')">Download 48x48</button>
+    </div>
+    <div>
+      <canvas id="icon128" width="128" height="128"></canvas>
+      <br><button onclick="download('icon128', 'icon128.png')">Download 128x128</button>
+    </div>
+  </div>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      const scale = size / 128;
+
+      // Background
+      ctx.fillStyle = '#3b82f6';
+      const radius = size * 0.15;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fill();
+
+      // DNA helix simplified as flask/beaker shape
+      ctx.fillStyle = 'white';
+
+      // Beaker body
+      const beakerWidth = size * 0.5;
+      const beakerHeight = size * 0.45;
+      const beakerX = (size - beakerWidth) / 2;
+      const beakerY = size * 0.35;
+
+      ctx.beginPath();
+      ctx.roundRect(beakerX, beakerY, beakerWidth, beakerHeight, size * 0.08);
+      ctx.fill();
+
+      // Beaker neck
+      const neckWidth = size * 0.3;
+      const neckHeight = size * 0.15;
+      const neckX = (size - neckWidth) / 2;
+      const neckY = size * 0.22;
+
+      ctx.beginPath();
+      ctx.roundRect(neckX, neckY, neckWidth, neckHeight, size * 0.03);
+      ctx.fill();
+
+      // Liquid inside (blue accent)
+      ctx.fillStyle = '#1e3a8a';
+      ctx.beginPath();
+      ctx.roundRect(beakerX + size * 0.05, beakerY + beakerHeight * 0.4, beakerWidth - size * 0.1, beakerHeight * 0.5, size * 0.05);
+      ctx.fill();
+
+      // Bubbles
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(size * 0.4, size * 0.6, size * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(size * 0.55, size * 0.55, size * 0.03, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw all icons
+    ['icon16', 'icon32', 'icon48', 'icon128'].forEach(id => {
+      drawIcon(document.getElementById(id));
+    });
+
+    function download(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
