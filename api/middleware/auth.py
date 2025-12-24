@@ -148,13 +148,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Check for Clerk user ID header (from frontend proxy)
             # This allows per-user isolation when using master key
             clerk_user_id = request.headers.get("X-Clerk-User-Id")
+            logger.info(f"[Auth] Master key used. X-Clerk-User-Id header: {clerk_user_id}")
             if clerk_user_id:
+                logger.info(f"[Auth] Using Clerk user_id: {clerk_user_id}")
                 return {
                     "user_id": clerk_user_id,
                     "subscription_tier": "free",
                     "is_admin": False
                 }
             # No Clerk ID - use admin (for direct API access)
+            logger.info("[Auth] No Clerk user ID, using admin")
             return {
                 "user_id": "admin",
                 "subscription_tier": "admin",
