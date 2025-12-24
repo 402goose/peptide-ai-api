@@ -233,21 +233,20 @@ class ChatUIAgent:
 
         start_time = datetime.now()
         try:
-            # Count initial messages (look for message bubbles with rounded corners)
-            # The message bubbles have rounded-2xl class and contain text
-            message_locator = self.page.locator('[class*="rounded-2xl"][class*="px-"]')
-            initial_count = await message_locator.count()
-            print(f"    📊 Initial message count: {initial_count}")
+            # Count assistant messages using data-testid attribute
+            assistant_msg_locator = self.page.locator('[data-testid="assistant-message"]')
+            initial_count = await assistant_msg_locator.count()
+            print(f"    📊 Initial assistant message count: {initial_count}")
 
-            # Wait for a new message bubble to appear (assistant response)
-            # Poll until we see more messages than before
+            # Wait for a new assistant message bubble to appear
+            # Poll until we see more assistant messages than before
             new_message_appeared = False
             for i in range(60):  # 30 seconds max wait for response to start
                 await asyncio.sleep(0.5)
-                current_count = await message_locator.count()
+                current_count = await assistant_msg_locator.count()
                 if current_count > initial_count:
                     new_message_appeared = True
-                    print(f"    📊 New message appeared (count: {current_count})")
+                    print(f"    📊 New assistant message appeared (count: {current_count})")
                     break
                 if i % 10 == 0 and i > 0:
                     print(f"    ⏳ Waiting for response... ({i * 0.5}s)")
