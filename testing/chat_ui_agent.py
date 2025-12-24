@@ -156,8 +156,8 @@ class ChatUIAgent:
             await self.page.goto(f"{WEB_URL}/chat", wait_until="networkidle", timeout=30000)
             self.metrics.page_load_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
-            # Wait for chat input to be ready
-            await self.page.wait_for_selector('textarea[placeholder*="peptide"], input[placeholder*="peptide"]', timeout=10000)
+            # Wait for chat input to be ready (handles both onboarding and chat modes)
+            await self.page.wait_for_selector('textarea, input[type="text"]', timeout=10000)
 
             self._log_action("navigate", {"url": f"{WEB_URL}/chat", "load_time_ms": self.metrics.page_load_time_ms})
             print(f"    📍 Loaded chat page in {self.metrics.page_load_time_ms}ms")
@@ -175,8 +175,8 @@ class ChatUIAgent:
 
         start_time = datetime.now()
         try:
-            # Find and click the textarea
-            textarea = self.page.locator('textarea[placeholder*="peptide"], textarea[placeholder*="Ask"]').first
+            # Find and click the textarea (works in both onboarding and chat modes)
+            textarea = self.page.locator('textarea').first
             await textarea.click()
 
             # Type the message (with slight delay for realism)
