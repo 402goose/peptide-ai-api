@@ -482,6 +482,126 @@ async def delete_conversation(
     return {"status": "deleted"}
 
 
+@router.patch("/chat/conversations/{conversation_id}")
+async def update_conversation(
+    conversation_id: str,
+    body: dict,
+    user: dict = Depends(get_current_user)
+):
+    """Update a conversation (e.g., rename)"""
+    db = get_database()
+    user_id = user["user_id"]
+
+    # Only allow updating title for now
+    update_fields = {}
+    if "title" in body:
+        update_fields["title"] = body["title"]
+
+    if not update_fields:
+        raise HTTPException(400, "No valid fields to update")
+
+    update_fields["updated_at"] = datetime.utcnow()
+
+    result = await db.conversations.update_one(
+        {"conversation_id": conversation_id, "user_id": user_id},
+        {"$set": update_fields}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(404, "Conversation not found")
+
+    return {"status": "updated"}
+
+
+@router.delete("/chat/conversations")
+async def delete_all_conversations(
+    user: dict = Depends(get_current_user)
+):
+    """Delete all conversations for a user (admin use)"""
+    db = get_database()
+    user_id = user["user_id"]
+
+    result = await db.conversations.delete_many({"user_id": user_id})
+
+    return {"deleted": result.deleted_count}
+
+
+@router.post("/chat/conversations/{conversation_id}/share")
+async def create_share_link(
+    conversation_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Create a public share link for a conversation"""
+    db = get_database()
+    user_id = user["user_id"]
+
+    # Get the conversation
+    conversation = await db.conversations.find_one({
+        "conversation_id": conversation_id,
+        "user_id": user_id
+    })
+
+    if not conversation:
+        raise HTTPException(404, "Conversation not found")
+
+    # Check if share already exists
+    existing_share = await db.shared_conversations.find_one({
+        "conversation_id": conversation_id
+    })
+
+    if existing_share:
+        return {
+            "share_id": existing_share["share_id"],
+            "share_url": f"/share/{existing_share['share_id']}"
+        }
+
+    # Create new share
+    share_id = str(uuid4())[:8]  # Short ID for nicer URLs
+
+    await db.shared_conversations.insert_one({
+        "share_id": share_id,
+        "conversation_id": conversation_id,
+        "user_id": user_id,
+        "title": conversation.get("title", "Untitled"),
+        "messages": conversation.get("messages", []),
+        "created_at": conversation.get("created_at", datetime.utcnow()),
+        "shared_at": datetime.utcnow()
+    })
+
+    return {
+        "share_id": share_id,
+        "share_url": f"/share/{share_id}"
+    }
+
+
+@router.get("/share/{share_id}")
+async def get_shared_conversation(share_id: str):
+    """
+    Get a publicly shared conversation (no auth required)
+
+    This endpoint is public - anyone with the link can view the conversation.
+    """
+    db = get_database()
+
+    shared = await db.shared_conversations.find_one({"share_id": share_id})
+
+    if not shared:
+        raise HTTPException(404, "Shared conversation not found")
+
+    # Return only the necessary fields for public viewing
+    return {
+        "share_id": shared["share_id"],
+        "title": shared.get("title", "Untitled"),
+        "messages": [
+            {"role": msg.get("role"), "content": msg.get("content")}
+            for msg in shared.get("messages", [])
+            if msg.get("content")  # Filter out empty messages
+        ],
+        "created_at": shared.get("created_at"),
+        "shared_at": shared.get("shared_at")
+    }
+
+
 # =============================================================================
 # HELPER FUNCTIONS (Placeholder implementations)
 # =============================================================================

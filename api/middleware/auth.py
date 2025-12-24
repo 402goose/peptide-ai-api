@@ -52,6 +52,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/health/config",
     }
 
+    # Path prefixes that don't require authentication
+    PUBLIC_PREFIXES = [
+        "/api/v1/share/",  # Public shared conversation viewing
+    ]
+
     # Endpoints that work with or without authentication
     # (user will be None if no auth provided)
     OPTIONAL_AUTH_PATHS = {
@@ -68,6 +73,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip auth for public paths
         if request.url.path in self.PUBLIC_PATHS:
             return await call_next(request)
+
+        # Skip auth for public path prefixes
+        for prefix in self.PUBLIC_PREFIXES:
+            if request.url.path.startswith(prefix):
+                return await call_next(request)
 
         # Skip auth for OPTIONS (CORS preflight)
         if request.method == "OPTIONS":
