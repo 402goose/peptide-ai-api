@@ -98,16 +98,22 @@ async def chat(
 
     # Get or create conversation
     conversation_id = body.conversation_id
+    conversation = None
     if conversation_id:
         conversation = await db.conversations.find_one({
             "conversation_id": conversation_id,
             "user_id": user_id
         })
         if not conversation:
-            raise HTTPException(404, "Conversation not found")
+            # Conversation doesn't exist for this user - create new one
+            # This handles cases where user has an old URL or conversation was from different user
+            logger.info(f"Conversation {conversation_id} not found for user {user_id}, creating new")
+            conversation_id = str(uuid4())
+
+    if conversation:
         messages = conversation.get("messages", [])
     else:
-        conversation_id = str(uuid4())
+        conversation_id = conversation_id or str(uuid4())
         messages = []
 
     # Add user message
@@ -188,16 +194,22 @@ async def chat_stream(
 
     # Get or create conversation
     conversation_id = body.conversation_id
+    conversation = None
     if conversation_id:
         conversation = await db.conversations.find_one({
             "conversation_id": conversation_id,
             "user_id": user_id
         })
         if not conversation:
-            raise HTTPException(404, "Conversation not found")
+            # Conversation doesn't exist for this user - create new one
+            # This handles cases where user has an old URL or conversation was from different user
+            logger.info(f"[Stream] Conversation {conversation_id} not found for user {user_id}, creating new")
+            conversation_id = str(uuid4())
+
+    if conversation:
         messages = conversation.get("messages", [])
     else:
-        conversation_id = str(uuid4())
+        conversation_id = conversation_id or str(uuid4())
         messages = []
 
     # Add user message
