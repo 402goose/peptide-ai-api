@@ -233,36 +233,48 @@ class ChatUIAgent:
 
         start_time = datetime.now()
         try:
-            # Wait for typing indicator to appear then disappear
-            # Or wait for response content to stabilize
+            # Count initial messages (look for message bubbles with rounded corners)
+            # The message bubbles have rounded-2xl class and contain text
+            message_locator = self.page.locator('[class*="rounded-2xl"][class*="px-"]')
+            initial_count = await message_locator.count()
+            print(f"    📊 Initial message count: {initial_count}")
 
-            # First wait for any response to start (typing indicator or new message)
-            # The typing indicator has animate-ping, or look for new content
-            await self.page.wait_for_selector(
-                '.animate-ping, [class*="Searching"], [class*="Analyzing"]',
-                timeout=15000
-            )
+            # Wait for a new message bubble to appear (assistant response)
+            # Poll until we see more messages than before
+            new_message_appeared = False
+            for i in range(60):  # 30 seconds max wait for response to start
+                await asyncio.sleep(0.5)
+                current_count = await message_locator.count()
+                if current_count > initial_count:
+                    new_message_appeared = True
+                    print(f"    📊 New message appeared (count: {current_count})")
+                    break
+                if i % 10 == 0 and i > 0:
+                    print(f"    ⏳ Waiting for response... ({i * 0.5}s)")
 
-            # Now wait for streaming to complete (indicator disappears or content stabilizes)
-            # Check every 500ms if content is still changing
+            if not new_message_appeared:
+                print(f"    ⏱️ Response timeout (no new message)")
+                return None
+
+            # Now wait for streaming to complete (content stabilizes)
             last_content = ""
             stable_count = 0
 
-            while stable_count < 3:  # Content stable for 1.5 seconds
+            while stable_count < 4:  # Content stable for 2 seconds
                 await asyncio.sleep(0.5)
 
-                # Get current response text
                 try:
-                    # Look for the last assistant message
-                    messages = await self.page.locator('[class*="message"], [class*="bubble"]').all()
-                    if messages:
-                        current_content = await messages[-1].inner_text()
-                        if current_content == last_content and len(current_content) > 10:
+                    # Get the last message bubble's text
+                    messages = self.page.locator('.mb-4.flex.gap-3 .rounded-2xl')
+                    count = await messages.count()
+                    if count > 0:
+                        current_content = await messages.last.inner_text()
+                        if current_content == last_content and len(current_content) > 20:
                             stable_count += 1
                         else:
                             stable_count = 0
                             last_content = current_content
-                except:
+                except Exception as e:
                     pass
 
                 # Timeout check
@@ -271,22 +283,16 @@ class ChatUIAgent:
 
             self.metrics.response_stream_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
-            # Get final response
-            try:
-                messages = await self.page.locator('[class*="rounded-2xl"][class*="bg-white"], [class*="rounded-2xl"][class*="bg-slate"]').all()
-                if len(messages) >= 2:
-                    response_text = await messages[-1].inner_text()
-                    self.conversation_history.append({"role": "assistant", "content": response_text[:500]})
-                    self._log_action("received_response", {
-                        "length": len(response_text),
-                        "time_ms": self.metrics.response_stream_time_ms
-                    })
-                    print(f"    🤖 Response received in {self.metrics.response_stream_time_ms}ms ({len(response_text)} chars)")
-                    return response_text
-            except:
-                pass
+            if last_content:
+                self.conversation_history.append({"role": "assistant", "content": last_content[:500]})
+                self._log_action("received_response", {
+                    "length": len(last_content),
+                    "time_ms": self.metrics.response_stream_time_ms
+                })
+                print(f"    🤖 Response received in {self.metrics.response_stream_time_ms}ms ({len(last_content)} chars)")
+                return last_content
 
-            return last_content
+            return None
 
         except PlaywrightTimeout:
             self.metrics.errors.append("Response timeout")
