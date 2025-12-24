@@ -508,6 +508,148 @@ async def store_persona_test_results(
     return {"status": "stored", "timestamp": results["timestamp"]}
 
 
+# =============================================================================
+# CHAT UI TEST RESULTS (New format from chat_ui_agent.py)
+# =============================================================================
+
+@router.get("/analytics/chat-ui-tests")
+async def get_chat_ui_test_results(
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get the latest Chat UI test results from chat_ui_agent.py.
+
+    This is the newer test format that actually interacts with the UI
+    and tracks detailed interaction metrics.
+    """
+    db = get_database()
+
+    # Try to get from database first (production)
+    latest = await db.chat_ui_test_runs.find_one(
+        sort=[("timestamp", -1)]
+    )
+
+    if latest:
+        # Remove MongoDB _id for JSON serialization
+        latest.pop("_id", None)
+
+        # Calculate variant breakdown
+        variant_breakdown = {}
+        for result in latest.get("results", []):
+            variant = result.get("experiment_variant") or "control"
+            if variant not in variant_breakdown:
+                variant_breakdown[variant] = {
+                    "count": 0,
+                    "total_satisfaction": 0,
+                    "total_follow_ups": 0,
+                    "total_sources": 0,
+                }
+            stats = variant_breakdown[variant]
+            stats["count"] += 1
+            stats["total_satisfaction"] += result.get("satisfaction_score", 0)
+            metrics = result.get("metrics", {})
+            stats["total_follow_ups"] += metrics.get("follow_ups_clicked", 0)
+            stats["total_sources"] += metrics.get("sources_viewed", 0)
+
+        # Calculate averages
+        for variant, stats in variant_breakdown.items():
+            if stats["count"] > 0:
+                stats["avg_satisfaction"] = stats["total_satisfaction"] / stats["count"]
+                stats["avg_follow_ups"] = stats["total_follow_ups"] / stats["count"]
+                stats["avg_sources_viewed"] = stats["total_sources"] / stats["count"]
+            else:
+                stats["avg_satisfaction"] = 0
+                stats["avg_follow_ups"] = 0
+                stats["avg_sources_viewed"] = 0
+            # Remove totals
+            del stats["total_satisfaction"]
+            del stats["total_follow_ups"]
+            del stats["total_sources"]
+
+        latest["variant_breakdown"] = variant_breakdown
+
+        return {
+            "status": "ok",
+            "results": latest
+        }
+
+    # Fall back to local file (development)
+    import os
+    import json
+
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    results_path = os.path.join(project_root, "testing", "chat_ui_test_results.json")
+
+    if os.path.exists(results_path):
+        with open(results_path) as f:
+            results = json.load(f)
+
+        # Calculate variant breakdown from local file
+        variant_breakdown = {}
+        for result in results.get("results", []):
+            variant = result.get("experiment_variant") or "control"
+            if variant not in variant_breakdown:
+                variant_breakdown[variant] = {
+                    "count": 0,
+                    "total_satisfaction": 0,
+                    "total_follow_ups": 0,
+                    "total_sources": 0,
+                }
+            stats = variant_breakdown[variant]
+            stats["count"] += 1
+            stats["total_satisfaction"] += result.get("satisfaction_score", 0)
+            metrics = result.get("metrics", {})
+            stats["total_follow_ups"] += metrics.get("follow_ups_clicked", 0)
+            stats["total_sources"] += metrics.get("sources_viewed", 0)
+
+        for variant, stats in variant_breakdown.items():
+            if stats["count"] > 0:
+                stats["avg_satisfaction"] = stats["total_satisfaction"] / stats["count"]
+                stats["avg_follow_ups"] = stats["total_follow_ups"] / stats["count"]
+                stats["avg_sources_viewed"] = stats["total_sources"] / stats["count"]
+            del stats["total_satisfaction"]
+            del stats["total_follow_ups"]
+            del stats["total_sources"]
+
+        results["variant_breakdown"] = variant_breakdown
+
+        return {
+            "status": "ok",
+            "results": results
+        }
+
+    return {
+        "status": "no_results",
+        "message": "No chat UI test results found. Run chat_ui_agent.py to generate.",
+        "results": None
+    }
+
+
+@router.post("/analytics/chat-ui-tests")
+async def store_chat_ui_test_results(
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Store Chat UI test results in the database.
+
+    Called by chat_ui_agent.py after running tests.
+    """
+    db = get_database()
+
+    # Parse JSON body
+    results = await request.json()
+
+    # Add timestamp if not present
+    if "timestamp" not in results:
+        results["timestamp"] = datetime.utcnow().isoformat()
+
+    # Store in database
+    await db.chat_ui_test_runs.insert_one(results)
+
+    return {"status": "stored", "timestamp": results["timestamp"]}
+
+
 @router.get("/analytics/persona-tests/history")
 async def get_persona_test_history(
     limit: int = 10,

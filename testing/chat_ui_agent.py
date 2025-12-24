@@ -656,7 +656,7 @@ async def upload_results(results: Dict) -> bool:
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
-                f"{API_URL}/api/v1/analytics/persona-tests",
+                f"{API_URL}/api/v1/analytics/chat-ui-tests",
                 json=results,
                 headers={"X-API-Key": API_KEY, "Content-Type": "application/json"}
             )
