@@ -17,6 +17,19 @@ from api.deps import get_settings, get_database
 logger = logging.getLogger(__name__)
 
 
+def cors_response(status_code: int, content: dict) -> JSONResponse:
+    """Create a JSONResponse with CORS headers for error responses."""
+    return JSONResponse(
+        status_code=status_code,
+        content=content,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """
     Middleware for API key authentication
@@ -55,7 +68,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         api_key = self._extract_api_key(request)
 
         if not api_key:
-            return JSONResponse(
+            return cors_response(
                 status_code=401,
                 content={
                     "error": "API key required",
@@ -68,7 +81,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         user_info = await self._validate_api_key(api_key)
 
         if not user_info:
-            return JSONResponse(
+            return cors_response(
                 status_code=401,
                 content={
                     "error": "Invalid API key",
