@@ -57,6 +57,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     OPTIONAL_AUTH_PATHS = {
         "/api/v1/analytics/track",
         "/api/v1/analytics/affiliate/click",
+        "/api/v1/feedback",
     }
 
     def __init__(self, app: ASGIApp):

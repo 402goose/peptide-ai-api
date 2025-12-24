@@ -11,7 +11,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from api.deps import get_database
-from api.middleware.auth import get_current_user
+from api.middleware.auth import get_current_user, get_optional_user
 
 router = APIRouter()
 
@@ -65,16 +65,17 @@ class FeedbackResponse(BaseModel):
 @router.post("/feedback", response_model=FeedbackResponse)
 async def create_feedback(
     body: FeedbackCreate,
-    user: dict = Depends(get_current_user)
+    user: Optional[dict] = Depends(get_optional_user)
 ):
     """
     Submit new feedback from a user.
 
     This captures structured feedback from the in-app feedback system
-    and stores it for product iteration.
+    and stores it for product iteration. Works for both authenticated
+    and anonymous users.
     """
     db = get_database()
-    user_id = user["user_id"]
+    user_id = user["user_id"] if user else "anonymous"
 
     feedback_id = str(uuid4())
     now = datetime.utcnow()
