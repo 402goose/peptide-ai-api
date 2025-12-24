@@ -159,6 +159,15 @@ class ChatUIAgent:
             # Wait for chat input to be ready (handles both onboarding and chat modes)
             await self.page.wait_for_selector('textarea, input[type="text"]', timeout=10000)
 
+            # Close any modal that might be open (feedback modal, etc.)
+            try:
+                close_button = self.page.locator('button:has(svg.lucide-x), [class*="modal"] button:first-child')
+                if await close_button.count() > 0:
+                    await close_button.first.click()
+                    await asyncio.sleep(0.3)
+            except:
+                pass
+
             self._log_action("navigate", {"url": f"{WEB_URL}/chat", "load_time_ms": self.metrics.page_load_time_ms})
             print(f"    📍 Loaded chat page in {self.metrics.page_load_time_ms}ms")
             return True
@@ -168,6 +177,17 @@ class ChatUIAgent:
             print(f"    ❌ Navigation failed: {e}")
             return False
 
+    async def _close_modal_if_open(self):
+        """Close any modal that might be blocking the UI"""
+        try:
+            modal = self.page.locator('.fixed.inset-0.z-50')
+            if await modal.count() > 0:
+                close_btn = self.page.locator('.fixed.inset-0.z-50 button:has(svg)').first
+                await close_btn.click()
+                await asyncio.sleep(0.3)
+        except:
+            pass
+
     async def send_message(self, message: str) -> bool:
         """Type a message and send it"""
         if not self.page:
@@ -175,6 +195,9 @@ class ChatUIAgent:
 
         start_time = datetime.now()
         try:
+            # Close any modal that might be blocking
+            await self._close_modal_if_open()
+
             # Find and click the textarea (works in both onboarding and chat modes)
             textarea = self.page.locator('textarea').first
             await textarea.click()
@@ -213,10 +236,11 @@ class ChatUIAgent:
             # Wait for typing indicator to appear then disappear
             # Or wait for response content to stabilize
 
-            # First wait for any response to start (typing indicator or message bubble)
+            # First wait for any response to start (typing indicator or new message)
+            # The typing indicator has animate-ping, or look for new content
             await self.page.wait_for_selector(
-                '.animate-pulse, [class*="streaming"], [class*="typing"]',
-                timeout=10000
+                '.animate-ping, [class*="Searching"], [class*="Analyzing"]',
+                timeout=15000
             )
 
             # Now wait for streaming to complete (indicator disappears or content stabilizes)
@@ -279,8 +303,8 @@ class ChatUIAgent:
             return None
 
         try:
-            # Find follow-up chips
-            chips = self.page.locator('button:has-text("?"), [class*="follow"] button, [class*="chip"] button')
+            # Find follow-up chips (rounded-full buttons in the scrollable container)
+            chips = self.page.locator('.scrollbar-hide button, button.rounded-full:not([type="submit"])')
             count = await chips.count()
 
             if count == 0:
