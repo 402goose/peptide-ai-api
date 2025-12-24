@@ -49,6 +49,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/health",
         "/health/ready",
         "/health/live",
+        "/health/config",
+    }
+
+    # Endpoints that work with or without authentication
+    # (user will be None if no auth provided)
+    OPTIONAL_AUTH_PATHS = {
+        "/api/v1/analytics/track",
+        "/api/v1/analytics/affiliate/click",
     }
 
     def __init__(self, app: ASGIApp):
@@ -66,6 +74,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Extract API key
         api_key = self._extract_api_key(request)
+
+        # For optional auth paths, proceed without auth if no key
+        if not api_key and request.url.path in self.OPTIONAL_AUTH_PATHS:
+            # Set empty user state so get_optional_user returns None
+            request.state.user_id = None
+            request.state.subscription_tier = None
+            request.state.is_admin = False
+            return await call_next(request)
 
         if not api_key:
             return cors_response(

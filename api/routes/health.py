@@ -7,7 +7,7 @@ Standard health check endpoints for monitoring and orchestration.
 from fastapi import APIRouter, Depends
 from datetime import datetime
 
-from api.deps import get_database
+from api.deps import get_database, get_settings
 
 router = APIRouter()
 
@@ -64,4 +64,34 @@ async def liveness_check():
     return {
         "status": "alive",
         "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.get("/health/config")
+async def config_check():
+    """
+    Config check - shows if required environment variables are configured.
+
+    Does NOT reveal actual values, just whether they are set.
+    """
+    import os
+
+    settings = get_settings()
+
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "config": {
+            "master_key_configured": settings.master_api_key != "dev-key-change-me",
+            "master_key_length": len(settings.master_api_key),
+            "master_key_preview": settings.master_api_key[:8] + "..." if len(settings.master_api_key) > 8 else "***",
+            "mongodb_configured": "localhost" not in settings.mongodb_url,
+            "llm_provider": settings.llm_provider,
+            "openai_configured": bool(settings.openai_api_key),
+            "api_key_header": settings.api_key_header,
+        },
+        "env_vars_present": {
+            "PEPTIDE_AI_MASTER_KEY": bool(os.getenv("PEPTIDE_AI_MASTER_KEY")),
+            "MONGODB_URL": bool(os.getenv("MONGODB_URL")),
+            "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
+        }
     }
