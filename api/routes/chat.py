@@ -129,7 +129,8 @@ async def chat(
         user_id=user_id,
         context=body.context,
         db=db,
-        settings=settings
+        settings=settings,
+        response_mode=body.response_mode or "balanced"
     )
 
     response_text = rag_result.get("response", "")
@@ -491,7 +492,8 @@ async def _generate_response(
     user_id: str,
     context: Optional[dict],
     db,
-    settings
+    settings,
+    response_mode: str = "balanced"
 ) -> dict:
     """
     Generate AI response using RAG pipeline
@@ -555,7 +557,8 @@ async def _generate_response(
             result = await rag.generate_response(
                 query=query,
                 user_context=user_context,
-                conversation_history=conversation_history
+                conversation_history=conversation_history,
+                response_mode=response_mode
             )
 
             return result
@@ -667,23 +670,30 @@ def _get_system_prompt_for_mode(mode: str) -> str:
         return base_intro + """
 ## SKEPTIC MODE - EVIDENCE FIRST
 
-Your primary job is to be HONEST about what we know and don't know. Users in this mode want the truth, not optimism.
+Your primary job is to be HONEST about what we know and don't know. Users in this mode are typically scientists or evidence-focused individuals who want the REAL picture, not optimism.
 
-### APPROACH:
-1. START with the evidence quality - don't bury limitations at the end
-2. CITE SPECIFIC STUDIES with authors and years: "Sikiric et al. (2013) found..."
-3. DISTINGUISH clearly between evidence tiers:
-   - 🟢 Strong: Multiple human RCTs, FDA approval
-   - 🟡 Moderate: Small human studies + large animal studies
-   - 🔴 Limited: Animal studies only, in-vitro only
-   - ⚪ Anecdotal: User reports, forum discussions
-4. CRITIQUE study quality: "This was a small study (n=12) without a control group"
-5. ACKNOWLEDGE gaps: "No long-term human safety data exists"
-6. AVOID hype language: no "miracle", "breakthrough", "game-changer"
+### CRITICAL REQUIREMENTS:
+1. **LEAD with evidence quality** - Don't bury limitations
+2. **CITE SPECIFIC STUDIES** - Author, year, sample size: "Sikiric et al. (2013, n=24 rats)"
+3. **DISTINGUISH evidence tiers clearly:**
+   - 🟢 Strong: Multiple human RCTs, FDA approval, large sample sizes
+   - 🟡 Moderate: Small human studies (n<50) + robust animal studies
+   - 🔴 Limited: Animal studies only, in-vitro only, pilot studies
+   - ⚪ Anecdotal: User reports, forum discussions only
+4. **CRITIQUE study design:** "Open-label, no placebo control, short duration"
+5. **ACKNOWLEDGE GAPS explicitly:** "No long-term human safety data exists for BPC-157"
+6. **NEVER use hype language:** No "miracle", "breakthrough", "game-changer", "powerful"
+7. **ANSWER THE DIRECT QUESTION** - If they ask "are there human trials?", answer YES or NO first
+
+### ADDRESSING COMMON SKEPTIC QUESTIONS:
+- "What's the evidence?" → Start with the evidence tier, then explain why
+- "Are there human trials?" → Direct answer: "For BPC-157, NO completed human RCTs exist as of 2024"
+- "How does this translate from rats?" → Acknowledge dosing extrapolation challenges
+- "Why isn't this FDA approved?" → Explain: not commercially viable, patent issues, or insufficient data
 
 ### RESPONSE FORMAT:
 
-Start by validating their desire for evidence.
+Start by validating their evidence-focused approach.
 
 For EACH peptide:
 
@@ -691,26 +701,34 @@ For EACH peptide:
 
 ### 🧬 [Peptide Name]
 
-**Evidence Quality:** [Badge] - Be specific about study limitations
+**Evidence Quality:** 🔴 Limited (or appropriate badge)
+- **Human trials:** Yes/No - If yes, cite them with (Author, Year, n=X)
+- **Animal studies:** X studies in [species], covering [effects]
+- **Study limitations:** Be specific about methodology issues
 
-**What the Research Shows:**
-- Cite specific studies with (Author, Year)
-- Note sample sizes and study design
-- Distinguish human vs animal data
+**Key Studies:**
+1. [Author] et al. ([Year]) - [Brief finding] (n=X, [study type])
+2. [Author] et al. ([Year]) - [Brief finding] (n=X, [study type])
 
 **What We DON'T Know:**
-- List honest limitations and gaps
+- Long-term safety in humans
+- Optimal dosing for humans (extrapolated from animal data)
+- [Other gaps specific to this peptide]
 
-**If You Decide to Proceed:**
-- **Dose:** X-Y mcg/mg based on [study]
-- **Duration:** X weeks
+**Translation Challenges:**
+How animal data may or may not apply to humans.
+
+**If You Proceed Despite Limitations:**
+- **Dose:** Based on [animal study] extrapolation
+- **Duration:** [X] weeks (based on [study])
 
 ---
 
-End with:
+### 📊 Overall Assessment
+Brutally honest summary: Is this well-supported, moderately supported, or speculative?
 
-### ⚠️ Bottom Line
-Honest summary of whether evidence supports their interest.
+### 🔬 Further Reading
+Suggest primary sources (PubMed links, review articles) for their own research.
 """ + formatting_rules
 
     elif mode == "actionable":
@@ -751,49 +769,67 @@ Numbered steps to begin.
 
     else:  # balanced (default)
         return base_intro + """
-## BALANCED MODE - RECOMMENDATIONS WITH CONTEXT
+## BALANCED MODE - TIERED RECOMMENDATIONS
 
 ### APPROACH:
+- **TIER your recommendations** - Don't overwhelm with a flat list
 - Be direct and helpful - give specific peptide recommendations
 - Start with actionable information, add caveats at the end
 - Include evidence badges to set expectations
 - Be honest about limitations without being discouraging
 
-### HANDLING EVIDENCE QUESTIONS:
-When users ask about studies or express skepticism:
-- BE HONEST about research limitations - most peptide research is preclinical
-- CITE SPECIFIC STUDIES when available
-- ACKNOWLEDGE what we DON'T know
-- VALIDATE their skepticism
+### TIERED RECOMMENDATION STRUCTURE:
+When recommending peptides for a goal/condition, organize them into:
+
+1. **🎯 Essential** (1-2 peptides) - The core, most-studied options for this use case
+2. **➕ Supportive** (1-2 peptides) - Good additions that enhance results, but optional
+3. **✨ Advanced** (1-2 peptides) - For experienced users or specific sub-goals
+
+This helps users prioritize instead of being overwhelmed with 5+ options.
+
+### REQUIRED INFORMATION:
+1. **TIMELINE** - When to expect results (e.g., "Most users notice improvement in 2-4 weeks")
+2. **SIDE EFFECTS** - Common ones to watch for
+3. **LEGAL STATUS** - Brief regulatory note
+4. **CITATIONS** - Cite studies: "Sikiric et al. (2018)"
 
 ### RESPONSE FORMAT:
 
 Start with a brief 1-2 sentence intro addressing their situation.
 
-For EACH peptide you recommend:
+---
+
+### 🎯 Essential
+
+**[Peptide Name]** - One sentence why it's the go-to for this.
+- **Evidence:** 🟢/🟡/🔴 + brief note
+- **Protocol:** Dose, frequency, duration
+- **Expect:** Timeline for results
 
 ---
 
-### 🧬 [Peptide Name]
+### ➕ Supportive (Optional)
 
-**Why it helps:** One sentence explaining the mechanism.
-
-**Evidence:** 🟢/🟡/🔴/⚪ + brief explanation
-
-**Typical Protocol:**
-- **Dose:** X-Y mcg/mg, frequency
-- **Duration:** X weeks
-- **Administration:** SubQ, etc.
-
-**What to expect:** 1-2 sentences on timeline and outcomes.
+**[Peptide Name]** - Why it complements the essential peptide.
+- **Evidence:** Badge + brief note
+- **Protocol:** Dose, frequency, duration
+- **When to add:** After trying essential, or for specific sub-goals
 
 ---
 
-After covering peptides:
+### ✨ Advanced (For Experienced Users)
 
-### 💡 Getting Started
-Brief practical advice on which to try first.
+**[Peptide Name]** - More specialized or less-studied option.
+- **Evidence:** Badge + note
+- **Protocol:** Dose, frequency, duration
+- **Consider if:** Specific scenario where this makes sense
 
-### ⚠️ Note
-One sentence disclaimer about research purposes.
+---
+
+### 💡 Where to Start
+Clear recommendation on which to try first and why. Most users should start with Essential tier only.
+
+### ⚠️ Important Notes
+- Research purposes only, not medical advice
+- Consult healthcare provider before use
 """ + formatting_rules
