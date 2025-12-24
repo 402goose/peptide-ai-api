@@ -574,6 +574,44 @@ async def create_share_link(
     }
 
 
+@router.delete("/admin/shared-conversations/cleanup")
+async def cleanup_old_shares(
+    user: dict = Depends(get_current_user)
+):
+    """
+    Delete shared conversations older than 3 days (admin only)
+    """
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Admin access required")
+
+    db = get_database()
+    from datetime import timedelta
+
+    cutoff_date = datetime.utcnow() - timedelta(days=3)
+
+    result = await db.shared_conversations.delete_many({
+        "shared_at": {"$lt": cutoff_date}
+    })
+
+    return {"deleted": result.deleted_count}
+
+
+@router.delete("/admin/shared-conversations/all")
+async def delete_all_shares(
+    user: dict = Depends(get_current_user)
+):
+    """
+    Delete ALL shared conversations (admin only)
+    """
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Admin access required")
+
+    db = get_database()
+    result = await db.shared_conversations.delete_many({})
+
+    return {"deleted": result.deleted_count}
+
+
 @router.get("/share/{share_id}")
 async def get_shared_conversation(share_id: str):
     """
