@@ -17,7 +17,8 @@ async def health_check():
     """Basic health check - always returns OK if API is running"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "2024-12-24-user-isolation"  # Version marker to verify deployment
     }
 
 

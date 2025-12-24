@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Peptide AI",
+  "name": "Peptide AI Beta Tester",
   "version": "1.0.0",
-  "description": "Research peptides instantly. Get evidence-based information on BPC-157, Semaglutide, TB-500, and more.",
+  "description": "Help improve Peptide AI by providing feedback as you use it.",
   "permissions": [
-    "storage",
-    "activeTab"
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -24,13 +23,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.reddit.com/*"],
+      "matches": [
+        "https://peptide-ai-web-production.up.railway.app/*",
+        "http://localhost:3000/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"]
     }
   ],
   "host_permissions": [
-    "https://peptide-ai-web-production.up.railway.app/*",
     "https://peptide-ai-api-production.up.railway.app/*"
   ]
 }
