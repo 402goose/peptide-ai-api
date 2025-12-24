@@ -105,7 +105,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
 
         # Validate API key
-        user_info = await self._validate_api_key(api_key)
+        user_info = await self._validate_api_key(api_key, request)
 
         if not user_info:
             return cors_response(
@@ -137,14 +137,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         return None
 
-    async def _validate_api_key(self, api_key: str) -> Optional[dict]:
+    async def _validate_api_key(self, api_key: str, request: Request) -> Optional[dict]:
         """
         Validate API key and return user info
 
         Returns dict with: user_id, subscription_tier, is_admin
         """
-        # Check master key (for dev/admin)
+        # Check master key (for dev/admin or frontend proxy)
         if api_key == self.settings.master_api_key:
+            # Check for Clerk user ID header (from frontend proxy)
+            # This allows per-user isolation when using master key
+            clerk_user_id = request.headers.get("X-Clerk-User-Id")
+            if clerk_user_id:
+                return {
+                    "user_id": clerk_user_id,
+                    "subscription_tier": "free",
+                    "is_admin": False
+                }
+            # No Clerk ID - use admin (for direct API access)
             return {
                 "user_id": "admin",
                 "subscription_tier": "admin",
