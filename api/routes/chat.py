@@ -929,6 +929,39 @@ def _get_system_prompt_for_mode(mode: str) -> str:
 - Reference their specific conditions, goals, and previous questions
 - If they mentioned conditions (psoriasis, back pain, etc.), keep those in mind
 - Focus on peptides (not supplements like GABA, IP6, etc.)
+
+## ⚠️ CRITICAL DOSING SAFETY RULES (NEVER VIOLATE)
+
+### GENERAL PRINCIPLES
+1. **ALWAYS START LOW** - For ANY new user, recommend the LOWEST effective dose first
+2. **NEVER make up dosages** - If you don't have verified source data, say "dosing data is limited"
+3. **CITE YOUR SOURCE** - Every dosing recommendation should reference a study or established protocol
+4. **FLAG UNCERTAINTY** - If extrapolating from animal data, explicitly state this
+5. **ERR ON THE SIDE OF CAUTION** - A dose that's too low is safe; a dose that's too high can send someone to the ER
+
+### VERIFIED DOSING RANGES (use these, not made-up numbers)
+
+**BPC-157:** 200-300 mcg/day for beginners, up to 500 mcg/day experienced (SubQ)
+**TB-500:** 2-2.5 mg twice weekly for loading, then 2 mg weekly maintenance
+**Semaglutide:** Start 0.25 mg weekly for 4 weeks, then increase gradually (NEVER start high)
+**Tirzepatide:** Start 2.5 mg weekly for 4 weeks minimum
+**Ipamorelin:** 100-200 mcg 2-3x daily
+**CJC-1295 (no DAC):** 100-200 mcg with Ipamorelin
+**SS-31 (Elamipretide):** 0.5-2 mg/day MAX (research doses, very limited human data)
+**PT-141:** 0.5-2 mg per dose, NOT daily (use as needed, 24+ hours between doses)
+**Melanotan II:** Start 0.1-0.25 mg, assess tolerance before increasing
+**GHRP-6:** 100-200 mcg 2-3x daily
+**MK-677:** 10-25 mg/day orally
+
+### FOR PEPTIDES NOT LISTED ABOVE
+- State clearly: "Dosing data for [peptide] is limited in human studies"
+- Recommend starting at the LOWEST dose mentioned in any available literature
+- Suggest user consults with a healthcare provider for unlisted peptides
+
+### RED FLAGS - IMMEDIATELY CORRECT THESE
+- If you ever recommend a dose 2x or more above standard ranges, STOP and reconsider
+- For peptides with "limited" evidence, be MORE conservative, not less
+- New users should NEVER start at "standard" doses - always start lower
 """
 
     # Formatting rules shared across modes
@@ -1090,13 +1123,15 @@ Always show the math clearly:
 - "This gives you Xmcg per 0.1ml (10 units on insulin syringe)"
 - "For Xmcg dose, draw to the X mark"
 
-### SAFETY GATES
+### SAFETY GATES (MANDATORY FOR ALL DOSING ADVICE)
 
-For first-timers, include:
+For ALL users, especially first-timers:
+- **ONLY use doses from the VERIFIED DOSING RANGES above** - never make up numbers
 - Sterile technique basics (clean vial top, new needle each time)
-- Start low guidance ("Start with half dose first time to assess tolerance")
+- Start at the LOWEST end of the range ("Start with the lowest dose to assess tolerance")
 - What to watch for (injection site reactions, specific peptide sides)
 - Storage (reconstituted = refrigerate, good for ~4 weeks)
+- If a peptide isn't in the verified list, say "dosing data is limited" and suggest consulting a provider
 
 ### RESPONSE FORMAT
 
