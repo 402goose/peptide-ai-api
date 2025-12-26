@@ -34,7 +34,10 @@ ACTION_MODE_SIGNALS = [
     r"\bwhat needle\b", r"\bhow much bac water\b", r"\bfirst dose\b",
     r"\bstarting tomorrow\b", r"\bmy vials?\b", r"\bmy peptides?\b",
     r"\binsulin needles?\b", r"\binsulin syringes?\b", r"\bbacteriostatic\b",
-    r"\bfirst time injecting\b", r"\bnew to peptides\b"
+    r"\bfirst time injecting\b", r"\bnew to peptides\b",
+    r"\bhow should i start\b", r"\bstarting\b", r"\bbegin\b",
+    r"\bgot.{0,20}peptide", r"\bordered\b", r"\bjust arrived\b",
+    r"\bwith everything\b", r"\bgot everything\b"
 ]
 
 # Signals that user is researching (wants information, comparing options)
@@ -61,9 +64,15 @@ def _detect_intent(message: str) -> str:
     research_matches = sum(1 for pattern in RESEARCH_MODE_SIGNALS if re.search(pattern, message_lower))
 
     # Check for supply-related keywords that strongly indicate action mode
-    supply_keywords = ["bac water", "bacteriostatic", "insulin needle", "insulin syringe", "vial", "reconstitut"]
+    # Include common typos like "back water" for "bac water"
+    supply_keywords = [
+        "bac water", "back water", "bacteriostatic",
+        "insulin needle", "insulin syringe", "syringe",
+        "vial", "reconstitut", "needle"
+    ]
     has_supplies = any(kw in message_lower for kw in supply_keywords)
 
+    # More lenient: if user says "I just got" + mentions supplies OR "how should i start"
     if action_matches >= 2 or (action_matches >= 1 and has_supplies):
         logger.info(f"[Intent] Detected ACTION/COACH mode (action_matches={action_matches}, has_supplies={has_supplies})")
         return "coach"
