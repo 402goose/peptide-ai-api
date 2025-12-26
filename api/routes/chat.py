@@ -27,59 +27,95 @@ logger = logging.getLogger(__name__)
 # INTENT DETECTION
 # =============================================================================
 
-# Signals that user is ready to act (has supplies, wants practical guidance)
-ACTION_MODE_SIGNALS = [
-    r"\bi just got\b", r"\bi have\b", r"\bi bought\b", r"\barrived today\b",
-    r"\bready to start\b", r"\bhow do i inject\b", r"\breconstitute\b",
-    r"\bwhat needle\b", r"\bhow much bac water\b", r"\bfirst dose\b",
-    r"\bstarting tomorrow\b", r"\bmy vials?\b", r"\bmy peptides?\b",
-    r"\binsulin needles?\b", r"\binsulin syringes?\b", r"\bbacteriostatic\b",
-    r"\bfirst time injecting\b", r"\bnew to peptides\b",
-    r"\bhow should i start\b", r"\bstarting\b", r"\bbegin\b",
-    r"\bgot.{0,20}peptide", r"\bordered\b", r"\bjust arrived\b",
-    r"\bwith everything\b", r"\bgot everything\b"
-]
-
-# Signals that user is researching (wants information, comparing options)
-RESEARCH_MODE_SIGNALS = [
-    r"\bwhat is\b", r"\btell me about\b", r"\bbenefits of\b",
-    r"\bvs\b", r"\bcompare\b", r"\bwhich is better\b",
-    r"\bshould i try\b", r"\bthinking about\b", r"\bconsidering\b",
-    r"\bresearch on\b", r"\bstudies\b", r"\bevidence\b"
+# Common peptide names to detect
+PEPTIDE_NAMES = [
+    "bpc-157", "bpc157", "bpc 157", "tb-500", "tb500", "tb 500",
+    "semaglutide", "tirzepatide", "ozempic", "wegovy", "mounjaro",
+    "ipamorelin", "cjc-1295", "cjc1295", "ghrp-6", "ghrp-2", "mk-677",
+    "pt-141", "melanotan", "mt2", "aod-9604", "sermorelin", "hexarelin",
+    "epithalon", "thymosin", "ll-37", "ghk-cu", "selank", "semax",
+    "dihexa", "nad+", "nad", "sr9009", "sr-9009"
 ]
 
 def _detect_intent(message: str) -> str:
     """
     Detect user intent from message to select appropriate response mode.
 
+    Uses semantic understanding rather than brittle regex patterns.
+
     Returns:
     - "coach": User has supplies, ready to start, needs practical guidance
     - "research": User is researching, comparing, wants information
     - "balanced": Default mode
     """
-    message_lower = message.lower()
+    msg = message.lower()
 
-    # Count matches for each mode
-    action_matches = sum(1 for pattern in ACTION_MODE_SIGNALS if re.search(pattern, message_lower))
-    research_matches = sum(1 for pattern in RESEARCH_MODE_SIGNALS if re.search(pattern, message_lower))
+    # === CATEGORY 1: Possession signals (they have something) ===
+    possession_words = ["got", "have", "bought", "ordered", "received", "arrived", "came in", "picked up", "my"]
+    has_possession = any(word in msg for word in possession_words)
 
-    # Check for supply-related keywords that strongly indicate action mode
-    # Include common typos like "back water" for "bac water"
-    supply_keywords = [
-        "bac water", "back water", "bacteriostatic",
-        "insulin needle", "insulin syringe", "syringe",
-        "vial", "reconstitut", "needle"
+    # === CATEGORY 2: Supply keywords (injection supplies) ===
+    supply_words = [
+        "bac water", "back water", "bacteriostatic", "sterile water",
+        "insulin needle", "insulin syringe", "syringe", "needle",
+        "vial", "reconstitut", "alcohol swab", "alcohol wipe"
     ]
-    has_supplies = any(kw in message_lower for kw in supply_keywords)
+    has_supplies = any(word in msg for word in supply_words)
 
-    # More lenient: if user says "I just got" + mentions supplies OR "how should i start"
-    if action_matches >= 2 or (action_matches >= 1 and has_supplies):
-        logger.info(f"[Intent] Detected ACTION/COACH mode (action_matches={action_matches}, has_supplies={has_supplies})")
+    # === CATEGORY 3: Readiness/action signals (wanting to do something) ===
+    action_words = [
+        "start", "begin", "try", "use", "take", "inject", "dose", "dosing",
+        "first time", "new to", "how do i", "how should i", "what do i",
+        "ready to", "going to", "about to", "planning to", "want to start"
+    ]
+    has_action_intent = any(word in msg for word in action_words)
+
+    # === CATEGORY 4: Specific peptide mentioned ===
+    mentions_peptide = any(peptide in msg for peptide in PEPTIDE_NAMES)
+
+    # === CATEGORY 5: Research signals ===
+    research_words = [
+        "what is", "tell me about", "benefits of", "side effects of",
+        "vs", "versus", "compare", "which is better", "difference between",
+        "should i try", "thinking about", "considering", "looking into",
+        "research", "studies", "evidence", "learn about", "curious about"
+    ]
+    has_research_intent = any(word in msg for word in research_words)
+
+    # === SCORING LOGIC ===
+    # Coach mode triggers when user seems ready to act
+    coach_score = 0
+    research_score = 0
+
+    if has_possession:
+        coach_score += 2
+    if has_supplies:
+        coach_score += 2
+    if has_action_intent:
+        coach_score += 1
+    if mentions_peptide and has_possession:
+        coach_score += 1  # "I got BPC-157" is strong signal
+    if mentions_peptide and has_action_intent:
+        coach_score += 1  # "How do I use BPC-157" is strong signal
+
+    if has_research_intent:
+        research_score += 2
+    if not has_possession and not has_supplies:
+        research_score += 1  # No supplies mentioned = probably researching
+
+    logger.info(f"[Intent] Scores - coach: {coach_score}, research: {research_score} | "
+                f"possession={has_possession}, supplies={has_supplies}, action={has_action_intent}, "
+                f"peptide={mentions_peptide}, research={has_research_intent}")
+
+    # Decision thresholds
+    if coach_score >= 3 and coach_score > research_score:
+        logger.info(f"[Intent] -> COACH mode")
         return "coach"
-    elif research_matches >= 2:
-        logger.info(f"[Intent] Detected RESEARCH mode (research_matches={research_matches})")
+    elif research_score >= 2 and research_score > coach_score:
+        logger.info(f"[Intent] -> RESEARCH mode")
         return "research"
 
+    logger.info(f"[Intent] -> BALANCED mode (default)")
     return "balanced"
 
 router = APIRouter()
