@@ -18,7 +18,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2024-12-24-v2-graceful-conversation"  # Version marker to verify deployment
+        "version": "2024-12-26-coach-mode"  # Version marker to verify deployment
     }
 
 
