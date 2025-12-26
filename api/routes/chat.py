@@ -14,6 +14,7 @@ import openai
 import logging
 import json
 
+import re
 from api.deps import get_database, get_settings
 from api.middleware.auth import get_current_user
 from api.journey_service import JourneyService
@@ -21,6 +22,56 @@ from llm.rag_pipeline import RAGPipeline
 from storage.weaviate_client import WeaviateClient
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# INTENT DETECTION
+# =============================================================================
+
+# Signals that user is ready to act (has supplies, wants practical guidance)
+ACTION_MODE_SIGNALS = [
+    r"\bi just got\b", r"\bi have\b", r"\bi bought\b", r"\barrived today\b",
+    r"\bready to start\b", r"\bhow do i inject\b", r"\breconstitute\b",
+    r"\bwhat needle\b", r"\bhow much bac water\b", r"\bfirst dose\b",
+    r"\bstarting tomorrow\b", r"\bmy vials?\b", r"\bmy peptides?\b",
+    r"\binsulin needles?\b", r"\binsulin syringes?\b", r"\bbacteriostatic\b",
+    r"\bfirst time injecting\b", r"\bnew to peptides\b"
+]
+
+# Signals that user is researching (wants information, comparing options)
+RESEARCH_MODE_SIGNALS = [
+    r"\bwhat is\b", r"\btell me about\b", r"\bbenefits of\b",
+    r"\bvs\b", r"\bcompare\b", r"\bwhich is better\b",
+    r"\bshould i try\b", r"\bthinking about\b", r"\bconsidering\b",
+    r"\bresearch on\b", r"\bstudies\b", r"\bevidence\b"
+]
+
+def _detect_intent(message: str) -> str:
+    """
+    Detect user intent from message to select appropriate response mode.
+
+    Returns:
+    - "coach": User has supplies, ready to start, needs practical guidance
+    - "research": User is researching, comparing, wants information
+    - "balanced": Default mode
+    """
+    message_lower = message.lower()
+
+    # Count matches for each mode
+    action_matches = sum(1 for pattern in ACTION_MODE_SIGNALS if re.search(pattern, message_lower))
+    research_matches = sum(1 for pattern in RESEARCH_MODE_SIGNALS if re.search(pattern, message_lower))
+
+    # Check for supply-related keywords that strongly indicate action mode
+    supply_keywords = ["bac water", "bacteriostatic", "insulin needle", "insulin syringe", "vial", "reconstitut"]
+    has_supplies = any(kw in message_lower for kw in supply_keywords)
+
+    if action_matches >= 2 or (action_matches >= 1 and has_supplies):
+        logger.info(f"[Intent] Detected ACTION/COACH mode (action_matches={action_matches}, has_supplies={has_supplies})")
+        return "coach"
+    elif research_matches >= 2:
+        logger.info(f"[Intent] Detected RESEARCH mode (research_matches={research_matches})")
+        return "research"
+
+    return "balanced"
 
 router = APIRouter()
 
@@ -275,7 +326,17 @@ async def chat_stream(
                 yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
                 # Build mode-specific system prompt
-                response_mode = body.response_mode or "balanced"
+                # If no explicit mode set, detect intent from message
+                if body.response_mode and body.response_mode != "balanced":
+                    response_mode = body.response_mode
+                else:
+                    response_mode = _detect_intent(body.message)
+                    if response_mode != "balanced":
+                        logger.info(f"[Chat] Auto-detected mode: {response_mode}")
+
+                # Send detected mode to frontend for UI adjustments
+                yield f"data: {json.dumps({'type': 'mode', 'mode': response_mode})}\n\n"
+
                 system_prompt = _get_system_prompt_for_mode(response_mode)
 
                 # Build context with evidence badges
@@ -935,6 +996,96 @@ Numbered steps to begin.
 2-3 practical tips from experienced users.
 
 *Disclaimer: Research purposes only.*
+""" + formatting_rules
+
+    elif mode == "coach":
+        return base_intro + """
+## COACH MODE - READY TO START
+
+The user has indicated they have supplies and are ready to begin. Your role shifts from educator to PRACTICAL COACH.
+
+### CRITICAL MINDSET SHIFT
+- They've ALREADY DECIDED to use these peptides - don't re-explain what they are
+- They need PRACTICAL guidance, not education
+- Be their experienced friend who's done this before
+- Ask clarifying questions to give PERSONALIZED advice
+
+### ASK BEFORE ADVISING (pick 1-2 relevant questions)
+
+If you don't know these details, ASK:
+1. **Vial size:** "What size vial did you get? (mg per vial)"
+2. **Experience:** "First time doing SubQ injections?"
+3. **Goals:** "What are you hoping to achieve?" (only if unclear)
+
+Don't ask all at once - be conversational.
+
+### RESPONSE APPROACH
+
+1. **Acknowledge their readiness** - "Great, you've got your supplies!"
+2. **Ask 1-2 qualifying questions** if needed for accurate dosing
+3. **Give SPECIFIC practical guidance:**
+   - Exact reconstitution amounts for THEIR vial size
+   - Exact units to draw on insulin syringe
+   - When to inject, how often
+4. **Include first-timer tips** if they're new
+5. **Suggest tracking** naturally at the end
+
+### FEATURE SUGGESTIONS (use naturally, don't force)
+
+Mention these features when relevant:
+- **Journey Tracker**: "Want to log your doses and track how you feel?"
+- **Stack Builder**: "I can add these to your Stack to check interactions"
+
+Phrase as offers, not pushes: "Would you like to..." or "If you want to track this..."
+
+### RECONSTITUTION MATH
+
+Always show the math clearly:
+- "Add Xml bac water to your Xmg vial"
+- "This gives you Xmcg per 0.1ml (10 units on insulin syringe)"
+- "For Xmcg dose, draw to the X mark"
+
+### SAFETY GATES
+
+For first-timers, include:
+- Sterile technique basics (clean vial top, new needle each time)
+- Start low guidance ("Start with half dose first time to assess tolerance")
+- What to watch for (injection site reactions, specific peptide sides)
+- Storage (reconstituted = refrigerate, good for ~4 weeks)
+
+### RESPONSE FORMAT
+
+### 🎯 Let's Get You Started
+
+[Warm acknowledgment of their readiness]
+
+**Quick question:** [1-2 specific questions if needed]
+
+---
+
+### 💉 Your Protocol
+
+**[Peptide Name] Reconstitution:**
+- Add X ml bac water to your Xmg vial
+- Concentration: Xmcg per 0.1ml (10 units)
+
+**Dosing:**
+- **Dose:** Xmcg (X units on syringe)
+- **Frequency:** Daily / EOD / etc
+- **Timing:** Morning / Before bed / etc
+- **Duration:** X weeks typical cycle
+
+**First Week Tips:**
+- Start with [lower dose] to assess tolerance
+- Watch for: [common sides]
+- [Any peptide-specific tips]
+
+---
+
+### 📊 Track Your Progress
+[Natural suggestion if applicable - not pushy]
+
+*Research purposes only. Consult a healthcare provider.*
 """ + formatting_rules
 
     else:  # balanced (default)
