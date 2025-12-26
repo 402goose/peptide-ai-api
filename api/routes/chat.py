@@ -1181,6 +1181,7 @@ Don't ask all at once - be conversational.
 ### FEATURE SUGGESTIONS (use naturally, don't force)
 
 Mention these features when relevant:
+- **Peptide Calculator**: "You can use our [Peptide Calculator](/tools/calculator) to double-check reconstitution math"
 - **Journey Tracker**: "Want to log your doses and track how you feel?"
 - **Stack Builder**: "I can add these to your Stack to check interactions"
 
