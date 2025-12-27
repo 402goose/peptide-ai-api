@@ -132,6 +132,35 @@ async def _create_indexes(db: AsyncIOMotorDatabase):
     await db.rate_limits.create_index("key", unique=True)
     await db.rate_limits.create_index("expires_at", expireAfterSeconds=0)
 
+    # Affiliate & Holistic Products
+    await db.products.create_index("product_id", unique=True)
+    await db.products.create_index("name")
+    await db.products.create_index("product_type")
+    await db.products.create_index([("name", "text")])
+
+    await db.symptoms.create_index("symptom_id", unique=True)
+    await db.symptoms.create_index("slug", unique=True)
+    await db.symptoms.create_index("category")
+    await db.symptoms.create_index([("name", "text"), ("keywords", "text")])
+
+    await db.lab_tests.create_index("test_id", unique=True)
+    await db.lab_tests.create_index("name")
+
+    await db.symptom_product_mappings.create_index([("symptom_id", 1), ("product_id", 1)], unique=True)
+
+    await db.affiliate_clicks.create_index("click_id", unique=True)
+    await db.affiliate_clicks.create_index([("user_id", 1), ("clicked_at", -1)])
+    await db.affiliate_clicks.create_index("product_id")
+    await db.affiliate_clicks.create_index("symptom_id")
+    await db.affiliate_clicks.create_index("source")
+
+    await db.affiliate_conversions.create_index("conversion_id", unique=True)
+    await db.affiliate_conversions.create_index("click_id")
+
+    await db.symptom_searches.create_index("search_id", unique=True)
+    await db.symptom_searches.create_index([("user_id", 1), ("searched_at", -1)])
+    await db.symptom_searches.create_index("query")
+
 
 async def close_database():
     """Close database connection"""

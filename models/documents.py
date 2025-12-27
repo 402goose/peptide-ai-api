@@ -570,3 +570,187 @@ class CreatorContent(BaseModel):
     attributed_revenue: float = 0.0
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# =============================================================================
+# AFFILIATE & HOLISTIC PRODUCTS MODELS
+# =============================================================================
+
+class ProductType(str, Enum):
+    """Type of product"""
+    PEPTIDE = "peptide"
+    SUPPLEMENT = "supplement"
+    HERB = "herb"
+    AMINO_ACID = "amino_acid"
+    VITAMIN = "vitamin"
+    MINERAL = "mineral"
+    ADAPTOGEN = "adaptogen"
+    PROBIOTIC = "probiotic"
+    ENZYME = "enzyme"
+    HORMONE = "hormone"
+    OTHER = "other"
+
+
+class SymptomCategory(str, Enum):
+    """Categories for symptoms"""
+    ENERGY_FATIGUE = "energy_fatigue"
+    COGNITIVE = "cognitive"
+    MOOD_MENTAL = "mood_mental"
+    SLEEP = "sleep"
+    GUT_DIGESTIVE = "gut_digestive"
+    HORMONAL_FEMALE = "hormonal_female"
+    HORMONAL_MALE = "hormonal_male"
+    HORMONAL_GENERAL = "hormonal_general"
+    THYROID = "thyroid"
+    METABOLIC = "metabolic"
+    IMMUNE = "immune"
+    INFLAMMATION_PAIN = "inflammation_pain"
+    LIVER_DETOX = "liver_detox"
+    CARDIOVASCULAR = "cardiovascular"
+    KIDNEY_FLUID = "kidney_fluid"
+    SKIN_HAIR = "skin_hair"
+    NEUROLOGICAL = "neurological"
+    RECOVERY = "recovery"
+    APPETITE_CRAVINGS = "appetite_cravings"
+    URINARY_REPRODUCTIVE = "urinary_reproductive"
+    TEMPERATURE = "temperature"
+
+
+class HolisticProduct(BaseModel):
+    """
+    A product (peptide or supplement) that can be recommended for symptoms
+    """
+    product_id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str                                   # Product name
+    product_type: ProductType
+    description: Optional[str] = None
+
+    # Affiliate info
+    affiliate_url: Optional[str] = None         # Link to purchase
+    affiliate_code: Optional[str] = None        # Discount/tracking code
+    vendor: Optional[str] = None                # Recommended vendor
+
+    # Metadata
+    is_peptide: bool = False
+    requires_prescription: bool = False
+    typical_dose: Optional[str] = None
+    typical_frequency: Optional[str] = None
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class LabTest(BaseModel):
+    """
+    A lab test that can be recommended for symptoms
+    """
+    test_id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str                                   # Test name
+    description: Optional[str] = None
+
+    # Affiliate info
+    affiliate_url: Optional[str] = None
+    vendor: Optional[str] = None                # Lab provider
+
+    # Metadata
+    typical_cost_range: Optional[str] = None    # e.g., "$50-100"
+    requires_fasting: bool = False
+    at_home_available: bool = False
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Symptom(BaseModel):
+    """
+    A symptom that users may experience
+    """
+    symptom_id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str                                   # Symptom name (e.g., "Brain fog")
+    slug: str                                   # URL-friendly slug
+    category: SymptomCategory
+    description: Optional[str] = None
+
+    # Related products and tests (stored as IDs for lookup)
+    recommended_products: List[str] = []        # Product IDs
+    recommended_labs: List[str] = []            # Lab test IDs
+
+    # Search optimization
+    keywords: List[str] = []                    # Alternative names/search terms
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SymptomProductMapping(BaseModel):
+    """
+    Maps symptoms to products with additional context
+    """
+    mapping_id: str = Field(default_factory=lambda: str(uuid4()))
+    symptom_id: str
+    product_id: str
+
+    # Recommendation strength
+    is_primary: bool = True                     # Primary vs supplementary recommendation
+    efficacy_notes: Optional[str] = None        # Why this product helps
+
+    # Source tracking
+    source: str = "holistic_guide"              # Where this recommendation came from
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AffiliateClick(BaseModel):
+    """
+    Tracks when users click affiliate links
+    """
+    click_id: str = Field(default_factory=lambda: str(uuid4()))
+    user_id: Optional[str] = None               # May be anonymous
+    session_id: Optional[str] = None
+
+    # What was clicked
+    product_id: str
+    symptom_id: Optional[str] = None            # If clicked from symptom context
+
+    # Context
+    source: str                                 # "journey", "chat", "stacks", "search"
+    source_id: Optional[str] = None             # journey_id, conversation_id, etc.
+
+    # Metadata
+    clicked_at: datetime = Field(default_factory=datetime.utcnow)
+    ip_hash: Optional[str] = None               # Anonymized IP for fraud detection
+    user_agent: Optional[str] = None
+
+
+class AffiliateConversion(BaseModel):
+    """
+    Tracks conversions from affiliate clicks
+    """
+    conversion_id: str = Field(default_factory=lambda: str(uuid4()))
+    click_id: str                               # Related click
+
+    # Conversion details
+    order_amount: Optional[float] = None
+    commission_amount: Optional[float] = None
+    vendor: str
+
+    # Status
+    status: str = "pending"                     # pending, confirmed, cancelled
+
+    converted_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SymptomSearch(BaseModel):
+    """
+    Tracks what symptoms users search for
+    """
+    search_id: str = Field(default_factory=lambda: str(uuid4()))
+    user_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+    # Search details
+    query: str                                  # Raw search query
+    matched_symptoms: List[str] = []            # Symptom IDs that matched
+
+    # Context
+    source: str                                 # "journey", "chat", "stacks", "search"
+
+    searched_at: datetime = Field(default_factory=datetime.utcnow)
