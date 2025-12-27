@@ -55,6 +55,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
     # Path prefixes that don't require authentication
     PUBLIC_PREFIXES = [
         "/api/v1/share/",  # Public shared conversation viewing
+        "/api/v1/affiliate/admin/seed",  # Seed endpoints for initial data
+        "/api/v1/affiliate/symptoms",  # Public symptom browsing
+        "/api/v1/affiliate/products",  # Public product browsing
+        "/api/v1/affiliate/categories",  # Public category listing
+        "/api/v1/affiliate/search",  # Public search
     ]
 
     # Endpoints that work with or without authentication
