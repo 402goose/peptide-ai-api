@@ -237,9 +237,16 @@ async def chat(
 
     response_text = rag_result.get("response", "")
 
-    # Add assistant message
-    assistant_message = ChatMessage(role="assistant", content=response_text)
-    messages.append(assistant_message.model_dump())
+    # Add assistant message with sources/follow-ups attached
+    assistant_message_dict = {
+        "role": "assistant",
+        "content": response_text,
+        "timestamp": datetime.utcnow().isoformat(),
+        "sources": rag_result.get("sources", []),
+        "disclaimers": rag_result.get("disclaimers", []),
+        "follow_ups": rag_result.get("follow_up_questions", [])
+    }
+    messages.append(assistant_message_dict)
 
     # Generate title if new conversation
     title = conversation.get("title") if body.conversation_id else None
@@ -483,9 +490,16 @@ Return ONLY a JSON array of 3-4 question strings."""
 
                 yield f"data: {json.dumps({'type': 'done', 'disclaimers': disclaimers, 'follow_up_questions': follow_ups})}\n\n"
 
-                # Save conversation
-                assistant_message = ChatMessage(role="assistant", content=full_response)
-                messages.append(assistant_message.model_dump())
+                # Save conversation with sources/follow-ups attached to message
+                assistant_message_dict = {
+                    "role": "assistant",
+                    "content": full_response,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "sources": sources,
+                    "disclaimers": disclaimers,
+                    "follow_ups": follow_ups
+                }
+                messages.append(assistant_message_dict)
 
                 title = messages[0]["content"][:50] + "..." if len(messages[0]["content"]) > 50 else messages[0]["content"]
 
