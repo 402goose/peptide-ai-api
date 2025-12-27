@@ -2,14 +2,16 @@
 Peptide AI - Dependency Injection
 
 Database connections and shared dependencies for FastAPI.
+Supports protocol-based injection for testing.
 """
 
-from typing import Optional
+from typing import Optional, Union, Any
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from functools import lru_cache
 import os
 
 from storage.weaviate_client import WeaviateClient
+from protocols import IDatabase, IVectorStore
 
 
 def _build_mongo_url() -> str:
@@ -28,11 +30,16 @@ def _build_mongo_url() -> str:
     return "mongodb://localhost:27017"
 
 # Global database connection
+# Supports both real Motor client and mock implementations
 _db_client: Optional[AsyncIOMotorClient] = None
-_db: Optional[AsyncIOMotorDatabase] = None
+_db: Optional[Union[AsyncIOMotorDatabase, IDatabase]] = None
 
 # Global Weaviate client
-_weaviate: Optional[WeaviateClient] = None
+# Supports both real WeaviateClient and mock implementations
+_weaviate: Optional[Union[WeaviateClient, IVectorStore]] = None
+
+# Flag to indicate if we're in test mode (skip initialization checks)
+_test_mode: bool = False
 
 
 class Settings:
@@ -169,11 +176,27 @@ async def close_database():
         _db_client.close()
 
 
-def get_database() -> AsyncIOMotorDatabase:
-    """Get database instance for dependency injection"""
+def get_database() -> Union[AsyncIOMotorDatabase, IDatabase]:
+    """Get database instance for dependency injection.
+
+    Returns either a real AsyncIOMotorDatabase or a mock IDatabase.
+    """
     if _db is None:
         raise RuntimeError("Database not initialized. Call init_database() first.")
     return _db
+
+
+def set_database(db: Union[AsyncIOMotorDatabase, IDatabase]) -> None:
+    """Set database instance for testing.
+
+    Allows injecting a mock database implementation.
+
+    Args:
+        db: Database instance (real or mock)
+    """
+    global _db, _test_mode
+    _db = db
+    _test_mode = True
 
 
 async def init_weaviate():
@@ -197,8 +220,43 @@ async def close_weaviate():
         await _weaviate.close()
 
 
-def get_weaviate() -> WeaviateClient:
-    """Get Weaviate client instance for dependency injection"""
+def get_weaviate() -> Union[WeaviateClient, IVectorStore]:
+    """Get Weaviate client instance for dependency injection.
+
+    Returns either a real WeaviateClient or a mock IVectorStore.
+    """
     if _weaviate is None:
         raise RuntimeError("Weaviate not initialized. Call init_weaviate() first.")
     return _weaviate
+
+
+def set_weaviate(client: Union[WeaviateClient, IVectorStore]) -> None:
+    """Set Weaviate client instance for testing.
+
+    Allows injecting a mock vector store implementation.
+
+    Args:
+        client: Weaviate client instance (real or mock)
+    """
+    global _weaviate, _test_mode
+    _weaviate = client
+    _test_mode = True
+
+
+def reset_for_testing() -> None:
+    """Reset all global state for testing.
+
+    Call this in test fixtures to ensure clean state between tests.
+    """
+    global _db_client, _db, _weaviate, _test_mode
+    _db_client = None
+    _db = None
+    _weaviate = None
+    _test_mode = False
+    # Clear settings cache
+    get_settings.cache_clear()
+
+
+def is_test_mode() -> bool:
+    """Check if running in test mode."""
+    return _test_mode
