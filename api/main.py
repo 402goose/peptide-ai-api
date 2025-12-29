@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from api.routes import chat, search, journey, health, feedback, analytics, experiments, affiliate, email
 from api.middleware.rate_limit import RateLimitMiddleware
@@ -45,10 +46,29 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# CORS origins configuration
+# In production, set CORS_ORIGINS env var to comma-separated allowed origins
+# Example: CORS_ORIGINS=https://peptide-ai.com,https://www.peptide-ai.com
+CORS_ORIGINS_ENV = os.getenv("CORS_ORIGINS", "")
+if CORS_ORIGINS_ENV:
+    # Production: use explicit origins
+    CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS_ENV.split(",") if origin.strip()]
+else:
+    # Development: allow common local origins
+    CORS_ORIGINS = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3000",
+    ]
+
+# Log configured origins
+logger.info(f"CORS origins configured: {CORS_ORIGINS}")
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict in production
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
