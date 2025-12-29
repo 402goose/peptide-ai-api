@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 
-from api.routes import chat, search, journey, health, feedback, analytics, experiments, affiliate
+from api.routes import chat, search, journey, health, feedback, analytics, experiments, affiliate, email
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.auth import AuthMiddleware
 from api.deps import init_database, close_database, init_weaviate, close_weaviate
@@ -87,6 +87,7 @@ app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"])
 app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
 app.include_router(experiments.router, prefix="/api/v1", tags=["Experiments"])
 app.include_router(affiliate.router, prefix="/api/v1", tags=["Affiliate"])
+app.include_router(email.router, prefix="/api/v1", tags=["Email"])
 
 
 @app.get("/")
