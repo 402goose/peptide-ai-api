@@ -27,6 +27,7 @@ class SourceType(str, Enum):
     BIORXIV = "biorxiv"
     MEDRXIV = "medrxiv"
     CHINAXIV = "chinaxiv"
+    CLINICALTRIALS = "clinical_trial"
     REDDIT = "reddit"
     FORUM = "forum"
     USER_JOURNEY = "user_journey"

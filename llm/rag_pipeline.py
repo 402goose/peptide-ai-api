@@ -98,8 +98,8 @@ class RAGPipeline:
         # 7. Apply safety filtering
         response_text = self._apply_safety_filter(response_text, classification)
 
-        # 8. Add disclaimers
-        disclaimers = self._get_disclaimers(classification)
+        # 8. Add disclaimers (dynamic based on peptides mentioned)
+        disclaimers = self._get_disclaimers(classification, classification.peptides_mentioned)
 
         # 9. Format sources
         sources = self._format_sources(context_docs)
@@ -505,23 +505,64 @@ Summary: {props.get('outcome_narrative', '')[:300]}...
 
         return response
 
-    def _get_disclaimers(self, classification: QueryClassification) -> List[str]:
-        """Get appropriate disclaimers based on classification"""
-        disclaimer_texts = {
-            "research_only": "This information is for research and educational purposes only, not medical advice.",
-            "consult_professional": "Always consult a qualified healthcare professional before using any peptides.",
-            "sourcing_legal": "Peptide legality varies by jurisdiction. Verify legal status in your area.",
-            "verify_source": "If obtaining peptides for research, verify quality through independent testing and COAs.",
-            "dosing_individual": "Dosing is highly individual. Start with the lowest effective dose and adjust based on response.",
-            "side_effects": "Monitor for side effects and discontinue use if concerning symptoms occur.",
-            "fda_status": "Many peptides are not FDA-approved for human use and are sold for research purposes only.",
-        }
+    def _get_disclaimers(
+        self,
+        classification: QueryClassification,
+        peptides: Optional[List[str]] = None
+    ) -> List[str]:
+        """Get dynamic disclaimers based on classification and mentioned peptides"""
+        disclaimers = []
 
-        return [
-            disclaimer_texts.get(d, d)
-            for d in classification.disclaimer_types
-            if d in disclaimer_texts
-        ]
+        # Base disclaimer for all responses
+        disclaimers.append("This is for educational purposes only, not medical advice.")
+
+        # Add FDA-specific disclaimers based on peptides mentioned
+        if peptides:
+            fda_approved = []
+            not_approved = []
+            investigational = []
+            banned = []
+
+            for peptide in peptides:
+                evidence = get_evidence_for_peptide(peptide)
+                fda_status = evidence.fda_status.lower()
+
+                if "fda approved" in fda_status or "fda-approved" in fda_status:
+                    fda_approved.append(peptide)
+                elif "banned" in fda_status:
+                    banned.append(peptide)
+                elif "investigational" in fda_status:
+                    investigational.append(peptide)
+                elif "not fda approved" in fda_status or "not approved" in fda_status:
+                    not_approved.append(peptide)
+
+            # Add specific FDA warnings
+            if banned:
+                disclaimers.append(f"⚠️ {', '.join(banned)}: Banned or restricted in many countries.")
+
+            if not_approved:
+                if len(not_approved) == 1:
+                    disclaimers.append(f"{not_approved[0]} is not FDA-approved for human use.")
+                elif len(not_approved) <= 3:
+                    disclaimers.append(f"{', '.join(not_approved)} are not FDA-approved for human use.")
+                else:
+                    disclaimers.append("Most peptides mentioned are not FDA-approved for human use.")
+
+            if investigational:
+                disclaimers.append(f"{', '.join(investigational)}: Currently in clinical trials.")
+
+        # Add query-type specific disclaimers
+        if classification.risk_level == RiskLevel.HIGH:
+            disclaimers.append("Consult a healthcare professional before use.")
+
+        if QueryType.DOSING in [classification.query_type]:
+            disclaimers.append("Dosing is individual. Start low, monitor response.")
+
+        if QueryType.SOURCING in [classification.query_type]:
+            disclaimers.append("Verify peptide legality in your jurisdiction.")
+
+        # Keep it to 3 max for clean UI
+        return disclaimers[:3]
 
     def _format_sources(self, context_docs: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """Format context docs as source citations"""
