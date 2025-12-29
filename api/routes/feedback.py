@@ -282,6 +282,7 @@ async def notify_feedback_givers(
     Requires admin access (TODO: add proper admin check).
     """
     from api.utils.email import send_email, format_feedback_update_email
+    from api.utils.clerk import get_user_email
 
     db = get_database()
     now = datetime.utcnow()
@@ -311,12 +312,15 @@ async def notify_feedback_givers(
 
     # Notify each user once (even if they gave multiple pieces of feedback)
     for feedback_user_id, feedback_docs in user_feedback_map.items():
-        # Get the email from any of their feedback docs
-        user_email = None
-        for doc in feedback_docs:
-            if doc.get("user_email"):
-                user_email = doc["user_email"]
-                break
+        # Look up user email from Clerk (primary source)
+        user_email = get_user_email(feedback_user_id)
+
+        # Fallback to stored email if Clerk lookup fails
+        if not user_email:
+            for doc in feedback_docs:
+                if doc.get("user_email"):
+                    user_email = doc["user_email"]
+                    break
 
         # Combine summaries if multiple feedback items
         summaries = [doc.get("summary", "No summary") for doc in feedback_docs]

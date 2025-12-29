@@ -48,6 +48,7 @@ arxiv>=2.0.0  # arXiv
 
 # Utilities
 python-dotenv>=1.0.0
+clerk-backend-api>=1.0.0  # Clerk Backend API for user lookups
 python-multipart>=0.0.6
 python-jose[cryptography]>=3.3.0  # JWT
 passlib[bcrypt]>=1.7.0
