@@ -11,7 +11,10 @@ from functools import lru_cache
 import os
 
 from storage.weaviate_client import WeaviateClient
-from api.protocols import IDatabase, IVectorStore
+# Temporarily commenting out for debugging
+# from api.protocols import IDatabase, IVectorStore
+IDatabase = object  # Temporary placeholder
+IVectorStore = object  # Temporary placeholder
 
 
 def _build_mongo_url() -> str:
