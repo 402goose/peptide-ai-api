@@ -1,26 +1,24 @@
 """
 Peptide AI - Email Endpoints
 
-Endpoints for sending emails to users.
+Endpoints for sending emails to users using Gmail SMTP.
 """
 
 import os
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+import html
 
 router = APIRouter()
 
-# Initialize Resend if API key is available
-resend_client = None
-try:
-    import resend
-    api_key = os.getenv("RESEND_API_KEY")
-    if api_key:
-        resend.api_key = api_key
-        resend_client = resend
-except ImportError:
-    pass
+# Gmail SMTP configuration
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = 587
 
 
 class SendJourneyEmailRequest(BaseModel):
@@ -34,53 +32,21 @@ class SendEmailResponse(BaseModel):
     """Response from sending an email"""
     success: bool
     message: str
-    email_id: Optional[str] = None
 
 
-@router.post("/email/journey", response_model=SendEmailResponse)
-async def send_journey_email(body: SendJourneyEmailRequest):
-    """
-    Send a journey plan to the user's email.
-
-    The journey content should be pre-formatted by the frontend.
-    """
-    if not resend_client:
-        raise HTTPException(
-            status_code=503,
-            detail="Email service not configured. Please set RESEND_API_KEY."
-        )
-
-    try:
-        # Send the email
-        result = resend_client.Emails.send({
-            "from": "Peptide AI <noreply@peptide.ai>",
-            "to": [body.to_email],
-            "subject": f"Your Journey Plan: {body.journey_title}",
-            "text": body.journey_content,
-            "html": _format_journey_html(body.journey_title, body.journey_content),
-        })
-
-        return SendEmailResponse(
-            success=True,
-            message="Email sent successfully",
-            email_id=result.get("id") if isinstance(result, dict) else str(result)
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send email: {str(e)}"
-        )
+def _get_smtp_credentials() -> tuple[str, str] | None:
+    """Get SMTP credentials from environment"""
+    user = os.getenv("GMAIL_USER")
+    password = os.getenv("GMAIL_APP_PASSWORD")
+    if user and password:
+        return user, password
+    return None
 
 
 def _format_journey_html(title: str, content: str) -> str:
     """Convert plain text journey content to simple HTML email"""
-    # Escape HTML characters
-    import html
+    escaped_title = html.escape(title)
     escaped_content = html.escape(content)
-
-    # Convert line breaks to <br> and preserve formatting
-    html_content = escaped_content.replace('\n', '<br>\n')
 
     return f"""
 <!DOCTYPE html>
@@ -88,12 +54,12 @@ def _format_journey_html(title: str, content: str) -> str:
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{html.escape(title)}</title>
+    <title>{escaped_title}</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background: linear-gradient(135deg, #3b82f6, #6366f1); padding: 20px; border-radius: 12px 12px 0 0;">
         <h1 style="color: white; margin: 0; font-size: 24px;">Your Peptide Journey</h1>
-        <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0;">{html.escape(title)}</p>
+        <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0;">{escaped_title}</p>
     </div>
 
     <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -109,3 +75,60 @@ def _format_journey_html(title: str, content: str) -> str:
 </body>
 </html>
 """
+
+
+@router.post("/email/journey", response_model=SendEmailResponse)
+async def send_journey_email(body: SendJourneyEmailRequest):
+    """
+    Send a journey plan to the user's email via Gmail SMTP.
+
+    Requires GMAIL_USER and GMAIL_APP_PASSWORD environment variables.
+    """
+    credentials = _get_smtp_credentials()
+    if not credentials:
+        raise HTTPException(
+            status_code=503,
+            detail="Email service not configured. Please set GMAIL_USER and GMAIL_APP_PASSWORD."
+        )
+
+    gmail_user, gmail_password = credentials
+
+    try:
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Your Journey Plan: {body.journey_title}"
+        msg["From"] = f"Peptide AI <{gmail_user}>"
+        msg["To"] = body.to_email
+
+        # Attach plain text and HTML versions
+        text_part = MIMEText(body.journey_content, "plain")
+        html_part = MIMEText(
+            _format_journey_html(body.journey_title, body.journey_content),
+            "html"
+        )
+
+        msg.attach(text_part)
+        msg.attach(html_part)
+
+        # Send via Gmail SMTP
+        context = ssl.create_default_context()
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls(context=context)
+            server.login(gmail_user, gmail_password)
+            server.sendmail(gmail_user, body.to_email, msg.as_string())
+
+        return SendEmailResponse(
+            success=True,
+            message="Email sent successfully"
+        )
+
+    except smtplib.SMTPAuthenticationError:
+        raise HTTPException(
+            status_code=503,
+            detail="Email authentication failed. Check GMAIL_USER and GMAIL_APP_PASSWORD."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send email: {str(e)}"
+        )
