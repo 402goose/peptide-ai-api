@@ -2,148 +2,34 @@
 Peptide AI - FastAPI Application
 
 Main entry point for the API layer.
+MINIMAL VERSION FOR DEBUGGING
 """
-print("DEBUG: Starting main.py import", flush=True)
+print("DEBUG: Starting minimal main.py", flush=True)
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
+from datetime import datetime
+
 print("DEBUG: FastAPI imported", flush=True)
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import logging
-print("DEBUG: Standard imports done", flush=True)
 
-try:
-    from api.routes import chat, search, journey, health, feedback, analytics, experiments, affiliate, email
-    print("DEBUG: Routes imported", flush=True)
-except Exception as e:
-    print(f"DEBUG: Route import failed: {e}", flush=True)
-    raise
-try:
-    from api.middleware.rate_limit import RateLimitMiddleware
-    print("DEBUG: Rate limit middleware imported", flush=True)
-except Exception as e:
-    print(f"DEBUG: Rate limit import failed: {e}", flush=True)
-    raise
-
-try:
-    from api.middleware.auth import AuthMiddleware
-    print("DEBUG: Auth middleware imported", flush=True)
-except Exception as e:
-    print(f"DEBUG: Auth import failed: {e}", flush=True)
-    raise
-
-try:
-    from api.deps import init_database, close_database, init_weaviate, close_weaviate
-    print("DEBUG: Deps imported", flush=True)
-except Exception as e:
-    print(f"DEBUG: Deps import failed: {e}", flush=True)
-    raise
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifecycle manager"""
-    # Startup
-    print("DEBUG: Lifespan starting", flush=True)
-    logger.info("Starting Peptide AI API...")
-
-    try:
-        await init_database()
-        logger.info("Database initialized")
-        print("DEBUG: Database initialized", flush=True)
-    except Exception as e:
-        print(f"DEBUG: Database init failed: {e}", flush=True)
-        logger.error(f"Database initialization failed: {e}")
-
-    try:
-        await init_weaviate()
-        logger.info("Weaviate initialized")
-        print("DEBUG: Weaviate initialized", flush=True)
-    except Exception as e:
-        print(f"DEBUG: Weaviate init failed: {e}", flush=True)
-        logger.error(f"Weaviate initialization failed: {e}")
-
-    print("DEBUG: Lifespan startup complete, yielding", flush=True)
-    yield
-
-    # Shutdown
-    logger.info("Shutting down Peptide AI API...")
-    try:
-        await close_weaviate()
-    except:
-        pass
-    try:
-        await close_database()
-    except:
-        pass
-
-
+# Create minimal app without lifespan or any other dependencies
 app = FastAPI(
     title="Peptide AI",
-    description="Research-grade peptide knowledge platform powered by RAG",
     version="0.1.0",
-    lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-print("DEBUG: FastAPI app created", flush=True)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
-# Rate limiting middleware
-app.add_middleware(RateLimitMiddleware)
-
-# Authentication middleware
-app.add_middleware(AuthMiddleware)
-
-
-# Exception handlers
-@app.exception_handler(ValueError)
-async def value_error_handler(request: Request, exc: ValueError):
-    return JSONResponse(
-        status_code=400,
-        content={"error": str(exc), "type": "validation_error"}
-    )
-
-
-@app.exception_handler(PermissionError)
-async def permission_error_handler(request: Request, exc: PermissionError):
-    return JSONResponse(
-        status_code=403,
-        content={"error": str(exc), "type": "permission_error"}
-    )
-
-
-# Include routers
-app.include_router(health.router, tags=["Health"])
-app.include_router(chat.router, prefix="/api/v1", tags=["Chat"])
-app.include_router(search.router, prefix="/api/v1", tags=["Search"])
-app.include_router(journey.router, prefix="/api/v1", tags=["Journey"])
-app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"])
-app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
-app.include_router(experiments.router, prefix="/api/v1", tags=["Experiments"])
-app.include_router(affiliate.router, prefix="/api/v1", tags=["Affiliate"])
-app.include_router(email.router, prefix="/api/v1", tags=["Email"])
+print("DEBUG: App created", flush=True)
 
 
 @app.get("/")
 async def root():
-    """Root endpoint - API info"""
-    return {
-        "name": "Peptide AI",
-        "version": "0.1.0",
-        "status": "operational",
-        "docs": "/docs"
-    }
+    """Root endpoint"""
+    return {"status": "ok", "version": "minimal-debug"}
+
+
+@app.get("/health")
+async def health():
+    """Health endpoint"""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+print("DEBUG: Routes defined, app ready", flush=True)
