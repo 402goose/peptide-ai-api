@@ -3,17 +3,42 @@ Peptide AI - FastAPI Application
 
 Main entry point for the API layer.
 """
+print("DEBUG: Starting main.py import", flush=True)
 
 from fastapi import FastAPI, Request
+print("DEBUG: FastAPI imported", flush=True)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
+print("DEBUG: Standard imports done", flush=True)
 
-from api.routes import chat, search, journey, health, feedback, analytics, experiments, affiliate, email
-from api.middleware.rate_limit import RateLimitMiddleware
-from api.middleware.auth import AuthMiddleware
-from api.deps import init_database, close_database, init_weaviate, close_weaviate
+try:
+    from api.routes import chat, search, journey, health, feedback, analytics, experiments, affiliate, email
+    print("DEBUG: Routes imported", flush=True)
+except Exception as e:
+    print(f"DEBUG: Route import failed: {e}", flush=True)
+    raise
+try:
+    from api.middleware.rate_limit import RateLimitMiddleware
+    print("DEBUG: Rate limit middleware imported", flush=True)
+except Exception as e:
+    print(f"DEBUG: Rate limit import failed: {e}", flush=True)
+    raise
+
+try:
+    from api.middleware.auth import AuthMiddleware
+    print("DEBUG: Auth middleware imported", flush=True)
+except Exception as e:
+    print(f"DEBUG: Auth import failed: {e}", flush=True)
+    raise
+
+try:
+    from api.deps import init_database, close_database, init_weaviate, close_weaviate
+    print("DEBUG: Deps imported", flush=True)
+except Exception as e:
+    print(f"DEBUG: Deps import failed: {e}", flush=True)
+    raise
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +69,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+print("DEBUG: FastAPI app created", flush=True)
 
 # CORS middleware
 app.add_middleware(
