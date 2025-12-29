@@ -6,7 +6,7 @@ uvicorn[standard]>=0.27.0
 starlette>=0.35.0
 
 # Data Validation
-pydantic>=2.5.0
+pydantic[email]>=2.5.0  # email extra for EmailStr validation
 pydantic-settings>=2.1.0
 
 # Database
