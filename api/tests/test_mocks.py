@@ -6,7 +6,7 @@ without requiring any external dependencies.
 """
 
 import pytest
-from tests.mocks import MockDatabase, MockLLMClient, MockVectorStore
+from api.tests.mocks import MockDatabase, MockLLMClient, MockVectorStore
 
 
 class TestMockDatabase:

@@ -10,12 +10,12 @@ FastAPI is not available (e.g., in minimal test environments).
 
 import pytest
 from datetime import datetime
-from tests.mocks import MockDatabase
+from api.tests.mocks import MockDatabase
 
 
 # Try to import FastAPI-dependent modules for unit tests
 try:
-    from routes.chat import _detect_intent, _generate_title, _get_disclaimers, _suggest_followups
+    from api.routes.chat import _detect_intent, _generate_title, _get_disclaimers, _suggest_followups
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False

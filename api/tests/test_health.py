@@ -14,12 +14,23 @@ async def test_health_endpoint(client: AsyncClient):
     response = await client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "ok"
+    assert data["status"] == "healthy"
 
 
 @pytest.mark.asyncio
-async def test_detailed_health(client: AsyncClient):
-    """Test detailed health check."""
-    response = await client.get("/health/detailed")
-    # May return 200 or 503 depending on services
+async def test_readiness_check(client: AsyncClient):
+    """Test readiness health check."""
+    response = await client.get("/health/ready")
+    # May return 200 or 503 depending on database connection
     assert response.status_code in [200, 503]
+    data = response.json()
+    assert "status" in data
+
+
+@pytest.mark.asyncio
+async def test_liveness_check(client: AsyncClient):
+    """Test liveness health check."""
+    response = await client.get("/health/live")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "alive"

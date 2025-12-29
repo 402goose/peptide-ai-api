@@ -7,7 +7,7 @@ using mock database implementations.
 
 import pytest
 from datetime import datetime, timedelta
-from tests.mocks import MockDatabase
+from api.tests.mocks import MockDatabase
 
 
 class TestSymptomListing:

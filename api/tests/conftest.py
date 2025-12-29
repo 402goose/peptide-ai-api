@@ -11,7 +11,7 @@ from typing import AsyncIterator
 
 from httpx import AsyncClient, ASGITransport
 
-from tests.mocks import MockDatabase, MockLLMClient, MockVectorStore
+from api.tests.mocks import MockDatabase, MockLLMClient, MockVectorStore
 
 
 # ============================================================================
@@ -53,8 +53,8 @@ async def app_with_mocks(
 
     Uses the setter functions in deps.py to inject mock implementations.
     """
-    import deps
-    from main import app
+    import api.deps as deps
+    from api.main import app
 
     # Reset state before test
     deps.reset_for_testing()
