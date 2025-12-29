@@ -7,10 +7,13 @@ Shared email sending functionality using Gmail SMTP.
 import os
 import smtplib
 import ssl
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Tuple
 import html
+
+logger = logging.getLogger(__name__)
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -21,7 +24,9 @@ def get_smtp_credentials() -> Optional[Tuple[str, str]]:
     user = os.getenv("GMAIL_USER")
     password = os.getenv("GMAIL_APP_PASSWORD")
     if user and password:
+        logger.info(f"SMTP credentials found for {user}")
         return user, password
+    logger.warning(f"SMTP credentials missing - GMAIL_USER: {'set' if user else 'missing'}, GMAIL_APP_PASSWORD: {'set' if password else 'missing'}")
     return None
 
 
@@ -38,6 +43,7 @@ def send_email(
     """
     credentials = get_smtp_credentials()
     if not credentials:
+        logger.error(f"Cannot send email to {to_email} - no SMTP credentials")
         return False
 
     gmail_user, gmail_password = credentials
@@ -62,9 +68,11 @@ def send_email(
             server.login(gmail_user, gmail_password)
             server.sendmail(gmail_user, to_email, msg.as_string())
 
+        logger.info(f"Email sent successfully to {to_email}")
         return True
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
         return False
 
 
