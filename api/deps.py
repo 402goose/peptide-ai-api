@@ -10,8 +10,8 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from functools import lru_cache
 import os
 
-from storage.weaviate_client import WeaviateClient
-from protocols import IDatabase, IVectorStore
+from api.storage.weaviate_client import WeaviateClient
+from api.protocols import IDatabase, IVectorStore
 
 
 def _build_mongo_url() -> str:

@@ -13,7 +13,7 @@ from enum import Enum
 from api.deps import get_database
 from api.middleware.auth import get_current_user
 from api.journey_service import JourneyService
-from models.documents import (
+from api.models.documents import (
     JourneyStatus, GoalCategory, AdministrationRoute,
     PeptideJourney, DoseLog, SymptomLog, JourneyMilestone
 )

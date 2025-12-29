@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 from uuid import uuid4
 import statistics
 
-from models.documents import (
+from api.models.documents import (
     UserProfile, PeptideJourney, JourneyGoal, DoseLog, SymptomLog,
     JourneyMilestone, JourneyNote, JourneyOutcomeSummary,
     PeptideStats, UserJourneyContext, JourneyStatus, GoalCategory,

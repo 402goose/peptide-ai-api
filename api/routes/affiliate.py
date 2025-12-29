@@ -15,7 +15,7 @@ import hashlib
 import re
 
 from api.deps import get_database
-from models.documents import (
+from api.models.documents import (
     HolisticProduct, Symptom, LabTest, SymptomProductMapping,
     AffiliateClick, AffiliateConversion, SymptomSearch,
     ProductType, SymptomCategory
