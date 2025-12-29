@@ -9,7 +9,7 @@ Classifies user queries to determine:
 """
 
 import logging
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from enum import Enum
 from pydantic import BaseModel
 import openai
@@ -225,7 +225,7 @@ class QueryClassifier:
                 conditions.append(condition)
         return conditions
 
-    def _rule_based_classify(self, query: str) -> tuple[QueryType, float]:
+    def _rule_based_classify(self, query: str) -> Tuple[QueryType, float]:
         """Rule-based query classification"""
         # Check for off-topic
         if not any(p in query for p in self.PEPTIDE_PATTERNS) and \
