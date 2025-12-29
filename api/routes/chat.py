@@ -18,8 +18,8 @@ import re
 from api.deps import get_database, get_settings
 from api.middleware.auth import get_current_user
 from api.journey_service import JourneyService
-from api.llm.rag_pipeline import RAGPipeline
-from api.storage.weaviate_client import WeaviateClient
+from llm.rag_pipeline import RAGPipeline
+from storage.weaviate_client import WeaviateClient
 
 logger = logging.getLogger(__name__)
 

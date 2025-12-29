@@ -10,7 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from functools import lru_cache
 import os
 
-from api.storage.weaviate_client import WeaviateClient
+from storage.weaviate_client import WeaviateClient
 from api.protocols import IDatabase, IVectorStore
 
 
