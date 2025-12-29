@@ -6,7 +6,7 @@ Collect and manage user feedback for product iteration.
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from uuid import uuid4
 
@@ -292,7 +292,7 @@ async def notify_feedback_givers(
     errors = []
 
     # Group feedback by user to avoid duplicate notifications
-    user_feedback_map: dict[str, list[dict]] = {}
+    user_feedback_map: Dict[str, List[dict]] = {}
 
     for feedback_id in body.feedback_ids:
         doc = await db.feedback.find_one({"id": feedback_id})

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 import hashlib
-from typing import Optional
+from typing import Optional, List, Tuple
 import logging
 
 from api.deps import get_settings, get_database
@@ -236,7 +236,7 @@ async def get_optional_user(request: Request) -> Optional[dict]:
     }
 
 
-async def require_tier(request: Request, required_tiers: list[str]) -> bool:
+async def require_tier(request: Request, required_tiers: List[str]) -> bool:
     """
     Check if user has required subscription tier
 
@@ -250,7 +250,7 @@ async def require_tier(request: Request, required_tiers: list[str]) -> bool:
     return tier in required_tiers
 
 
-def create_api_key(user_id: str) -> tuple[str, str]:
+def create_api_key(user_id: str) -> Tuple[str, str]:
     """
     Create a new API key for a user
 

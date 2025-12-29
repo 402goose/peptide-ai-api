@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 from datetime import datetime, timedelta
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 from api.deps import get_settings, get_database
 
@@ -109,7 +109,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self,
         key: str,
         limit: int
-    ) -> tuple[bool, int, Optional[datetime]]:
+    ) -> Tuple[bool, int, Optional[datetime]]:
         """
         Check if request is within rate limit
 
