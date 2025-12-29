@@ -9,13 +9,14 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from typing import Optional, Tuple
 import html
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
 
-def get_smtp_credentials() -> tuple[str, str] | None:
+def get_smtp_credentials() -> Optional[Tuple[str, str]]:
     """Get SMTP credentials from environment"""
     user = os.getenv("GMAIL_USER")
     password = os.getenv("GMAIL_APP_PASSWORD")
@@ -28,7 +29,7 @@ def send_email(
     to_email: str,
     subject: str,
     text_content: str,
-    html_content: str | None = None
+    html_content: Optional[str] = None
 ) -> bool:
     """
     Send an email via Gmail SMTP.
@@ -71,8 +72,8 @@ def format_feedback_update_email(
     update_title: str,
     update_message: str,
     original_feedback_summary: str,
-    test_instructions: str | None = None
-) -> tuple[str, str]:
+    test_instructions: Optional[str] = None
+) -> Tuple[str, str]:
     """
     Format an email for feedback update notification.
 

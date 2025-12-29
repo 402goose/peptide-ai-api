@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Tuple
 import html
 
 router = APIRouter()
@@ -34,7 +34,7 @@ class SendEmailResponse(BaseModel):
     message: str
 
 
-def _get_smtp_credentials() -> tuple[str, str] | None:
+def _get_smtp_credentials() -> Optional[Tuple[str, str]]:
     """Get SMTP credentials from environment"""
     user = os.getenv("GMAIL_USER")
     password = os.getenv("GMAIL_APP_PASSWORD")
