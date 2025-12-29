@@ -5,7 +5,7 @@ Defines the interface for LLM operations, enabling mock implementations
 for testing without making real API calls.
 """
 
-from typing import Protocol, AsyncIterator, Any, Optional, runtime_checkable
+from typing import Protocol, AsyncIterator, Any, Optional, runtime_checkable, List, Dict
 from dataclasses import dataclass
 
 
@@ -28,7 +28,7 @@ class ChatCompletionChoice:
 class ChatCompletionChunk:
     """A chunk of streaming chat completion."""
     id: str
-    choices: list["ChatCompletionChunkChoice"]
+    choices: List["ChatCompletionChunkChoice"]
 
 
 @dataclass
@@ -50,9 +50,9 @@ class ChatCompletionDelta:
 class ChatCompletionResponse:
     """Response from a chat completion."""
     id: str
-    choices: list[ChatCompletionChoice]
+    choices: List[ChatCompletionChoice]
     model: str
-    usage: Optional[dict[str, int]] = None
+    usage: Optional[Dict[str, int]] = None
 
 
 @runtime_checkable
@@ -62,7 +62,7 @@ class IChatCompletions(Protocol):
     async def create(
         self,
         model: str,
-        messages: list[dict[str, str]],
+        messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 2000,
         stream: bool = False,
@@ -103,4 +103,4 @@ class ILLMClient(Protocol):
 
 
 # Convenience type for messages
-MessageList = list[dict[str, str]]
+MessageList = List[Dict[str, str]]

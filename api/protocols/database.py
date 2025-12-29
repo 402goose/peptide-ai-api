@@ -5,7 +5,7 @@ Defines the interface for database operations, enabling mock implementations
 for testing without requiring a real MongoDB connection.
 """
 
-from typing import Protocol, AsyncIterator, Any, Optional, runtime_checkable
+from typing import Protocol, AsyncIterator, Any, Optional, runtime_checkable, Dict, List
 
 
 @runtime_checkable
@@ -13,61 +13,61 @@ class ICollection(Protocol):
     """Protocol for a database collection (like MongoDB collection)."""
 
     async def find_one(
-        self, filter: dict[str, Any], *args: Any, **kwargs: Any
-    ) -> Optional[dict[str, Any]]:
+        self, filter: Dict[str, Any], *args: Any, **kwargs: Any
+    ) -> Optional[Dict[str, Any]]:
         """Find a single document matching the filter."""
         ...
 
     def find(
-        self, filter: dict[str, Any], *args: Any, **kwargs: Any
+        self, filter: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> "IAsyncCursor":
         """Find documents matching the filter. Returns a cursor."""
         ...
 
     async def insert_one(
-        self, document: dict[str, Any], *args: Any, **kwargs: Any
+        self, document: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> Any:
         """Insert a single document."""
         ...
 
     async def insert_many(
-        self, documents: list[dict[str, Any]], *args: Any, **kwargs: Any
+        self, documents: List[Dict[str, Any]], *args: Any, **kwargs: Any
     ) -> Any:
         """Insert multiple documents."""
         ...
 
     async def update_one(
-        self, filter: dict[str, Any], update: dict[str, Any], *args: Any, **kwargs: Any
+        self, filter: Dict[str, Any], update: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> Any:
         """Update a single document."""
         ...
 
     async def update_many(
-        self, filter: dict[str, Any], update: dict[str, Any], *args: Any, **kwargs: Any
+        self, filter: Dict[str, Any], update: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> Any:
         """Update multiple documents."""
         ...
 
     async def delete_one(
-        self, filter: dict[str, Any], *args: Any, **kwargs: Any
+        self, filter: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> Any:
         """Delete a single document."""
         ...
 
     async def delete_many(
-        self, filter: dict[str, Any], *args: Any, **kwargs: Any
+        self, filter: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> Any:
         """Delete multiple documents."""
         ...
 
     async def count_documents(
-        self, filter: dict[str, Any], *args: Any, **kwargs: Any
+        self, filter: Dict[str, Any], *args: Any, **kwargs: Any
     ) -> int:
         """Count documents matching the filter."""
         ...
 
     def aggregate(
-        self, pipeline: list[dict[str, Any]], *args: Any, **kwargs: Any
+        self, pipeline: List[Dict[str, Any]], *args: Any, **kwargs: Any
     ) -> "IAsyncCursor":
         """Run an aggregation pipeline."""
         ...
@@ -95,7 +95,7 @@ class IAsyncCursor(Protocol):
         """Limit the number of documents."""
         ...
 
-    async def to_list(self, length: Optional[int] = None) -> list[dict[str, Any]]:
+    async def to_list(self, length: Optional[int] = None) -> List[Dict[str, Any]]:
         """Convert cursor to list."""
         ...
 
@@ -103,7 +103,7 @@ class IAsyncCursor(Protocol):
         """Async iteration support."""
         ...
 
-    async def __anext__(self) -> dict[str, Any]:
+    async def __anext__(self) -> Dict[str, Any]:
         """Get next document."""
         ...
 
@@ -129,6 +129,6 @@ class IDatabase(Protocol):
         """Get a collection by name."""
         ...
 
-    async def list_collection_names(self) -> list[str]:
+    async def list_collection_names(self) -> List[str]:
         """List all collection names."""
         ...

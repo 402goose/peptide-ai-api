@@ -5,7 +5,7 @@ Defines the interface for vector search operations, enabling mock implementation
 for testing without requiring a real Weaviate connection.
 """
 
-from typing import Protocol, Optional, Any, runtime_checkable
+from typing import Protocol, Optional, Any, runtime_checkable, Dict, List
 from dataclasses import dataclass, field
 
 
@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 class SearchResult:
     """A single search result from vector store."""
     id: str
-    properties: dict[str, Any]
+    properties: Dict[str, Any]
     score: Optional[float] = None
-    vector: Optional[list[float]] = None
+    vector: Optional[List[float]] = None
 
 
 @dataclass
@@ -23,7 +23,7 @@ class VectorStoreStats:
     """Statistics about the vector store."""
     total_chunks: int = 0
     total_outcomes: int = 0
-    collections: list[str] = field(default_factory=list)
+    collections: List[str] = field(default_factory=list)
 
 
 @runtime_checkable
@@ -52,9 +52,9 @@ class IVectorStore(Protocol):
         query: str,
         limit: int = 10,
         alpha: float = 0.5,
-        peptide_filter: Optional[list[str]] = None,
+        peptide_filter: Optional[List[str]] = None,
         include_outcomes: bool = True,
-    ) -> list[dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """
         Perform hybrid search combining BM25 and vector similarity.
 
@@ -74,8 +74,8 @@ class IVectorStore(Protocol):
         self,
         query: str,
         limit: int = 10,
-        peptide_filter: Optional[list[str]] = None,
-    ) -> list[dict[str, Any]]:
+        peptide_filter: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Perform pure vector/semantic search.
 
@@ -93,8 +93,8 @@ class IVectorStore(Protocol):
         self,
         query: str,
         limit: int = 10,
-        peptide_filter: Optional[list[str]] = None,
-    ) -> list[dict[str, Any]]:
+        peptide_filter: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Perform pure BM25/keyword search.
 
@@ -112,8 +112,8 @@ class IVectorStore(Protocol):
         self,
         chunk_id: str,
         content: str,
-        metadata: dict[str, Any],
-        vector: Optional[list[float]] = None,
+        metadata: Dict[str, Any],
+        vector: Optional[List[float]] = None,
     ) -> None:
         """
         Index a document chunk in the vector store.
@@ -130,8 +130,8 @@ class IVectorStore(Protocol):
         self,
         outcome_id: str,
         content: str,
-        metadata: dict[str, Any],
-        vector: Optional[list[float]] = None,
+        metadata: Dict[str, Any],
+        vector: Optional[List[float]] = None,
     ) -> None:
         """
         Index a journey outcome in the vector store.
