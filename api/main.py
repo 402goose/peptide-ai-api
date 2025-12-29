@@ -49,16 +49,38 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifecycle manager"""
     # Startup
+    print("DEBUG: Lifespan starting", flush=True)
     logger.info("Starting Peptide AI API...")
-    await init_database()
-    logger.info("Database initialized")
-    await init_weaviate()
-    logger.info("Weaviate initialized")
+
+    try:
+        await init_database()
+        logger.info("Database initialized")
+        print("DEBUG: Database initialized", flush=True)
+    except Exception as e:
+        print(f"DEBUG: Database init failed: {e}", flush=True)
+        logger.error(f"Database initialization failed: {e}")
+
+    try:
+        await init_weaviate()
+        logger.info("Weaviate initialized")
+        print("DEBUG: Weaviate initialized", flush=True)
+    except Exception as e:
+        print(f"DEBUG: Weaviate init failed: {e}", flush=True)
+        logger.error(f"Weaviate initialization failed: {e}")
+
+    print("DEBUG: Lifespan startup complete, yielding", flush=True)
     yield
+
     # Shutdown
     logger.info("Shutting down Peptide AI API...")
-    await close_weaviate()
-    await close_database()
+    try:
+        await close_weaviate()
+    except:
+        pass
+    try:
+        await close_database()
+    except:
+        pass
 
 
 app = FastAPI(
